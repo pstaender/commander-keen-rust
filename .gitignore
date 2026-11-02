@@ -1,0 +1,16 @@
+/target
+# original game data is copyrighted - never commit it
+/KEEN6/
+/KEEN5/
+/KEEN4/
+# derived from the copyrighted executable
+/re/*.exe
+/re/decomp/
+/re/batch_*.json
+.DS_Store
+/.claude/
+/re/k4/
+/re/k5/
+# remaster packs (derived from the game graphics)
+/packs/
+.env

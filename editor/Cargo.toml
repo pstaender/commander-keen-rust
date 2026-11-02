@@ -1,0 +1,14 @@
+[package]
+name = "keen-editor"
+version = "0.1.0"
+edition = "2021"
+description = "Commander Keen Editor: level and world map editor for the Keen 4-6 reimplementation"
+
+[[bin]]
+name = "keen-editor"
+path = "src/main.rs"
+
+[dependencies]
+keen = { path = ".." }
+eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow", "persistence", "wayland", "x11"] }
+rfd = "0.17"
