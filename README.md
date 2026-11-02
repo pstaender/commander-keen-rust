@@ -267,3 +267,5 @@ See `CLAUDE.md` for the code layout and porting conventions, and
 
 Commander Keen is a trademark of id Software. This project contains no
 original game data or code. It only reads the files from a copy you own.
+
+This project is for educational purpose only.
