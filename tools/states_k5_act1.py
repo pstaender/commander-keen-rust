@@ -1,0 +1,47 @@
+"""Keen 5 states and functions of CK5_ACT1 (code segment 0x1f92)."""
+
+RENAME = {
+    0x1ae6: 'S_FUSEFLASH1',
+    0x1a6e: 'S_TELEPORT1',
+    0x1a8c: 'S_TELEPORT2',
+    0x1aaa: 'S_TELEPORTZAP1',
+    0x1ac8: 'S_TELEPORTZAP2',
+    # 0x1ae6 is the first fuse flash state (auto-named S_THROWROPE1)
+    0x1b04: 'S_FUSEFLASH2',
+    0x1b22: 'S_FUSEFLASH3',
+    0x1b40: 'S_DEADMACHINE',
+    0x1b7c: 'S_SLOTPLAT1',
+    0x1b9a: 'S_SLOTPLAT2',
+    0x1c12: 'S_STATICPLAT',
+    0x1c30: 'S_GOPLAT',
+    0x1c4e: 'S_GOSLOTPLAT1',
+    0x1c6c: 'S_GOSLOTPLAT2',
+    0x1ccc: 'S_VOLTEFACE1',
+    0x1cea: 'S_VOLTEFACE2',
+    0x1d08: 'S_VOLTEFACE3',
+    0x1d26: 'S_VOLTEFACE4',
+    0x1d44: 'S_VOLTEFACESTUN',
+}
+
+FUNCS = {
+    0x1f986: 'act1::c_clip_side',
+    0x1f9ad: 'act1::c_clip_top',
+    0x1f9c8: 'act1::r_land',
+    0x1fa39: 'act1::r_bounce',
+    0x1fe4a: 'act1::t_bonus',
+    0x1fe65: 'act1::t_falling_bonus',
+    0x1ffc2: 'act1::t_dead_machine',
+    0x20096: 'act1::t_platform',
+    0x202bc: 'act1::t_slot_plat',
+    0x2053b: 'act1::t_drop_plat_sit',
+    0x2056e: 'act1::t_drop_plat_fall',
+    0x205d9: 'act1::t_drop_plat_rise',
+    0x20705: 'act1::t_goplat',
+    0x20925: 'act1::t_go_slot_plat',
+    0x20b9e: 'act1::t_volte',
+    0x20dbd: 'act1::c_volte',
+    0x20e44: 'act1::t_sneak_plat',
+    0x20f1d: 'act1::t_cannon',
+    0x20fa9: 'act1::c_cshot',
+    0x20fcc: 'act1::r_cshot',
+}
