@@ -82,8 +82,11 @@ runtime and are never committed.
   field and score box draw at xoff 0. The original 320 code paths stay
   unchanged so the demos keep in sync. Outside the game loop only the ID
   intro (Terminator, `ega_render_wide` paints beyond the 320 EGA view) and
-  the control panel (`Surface::extend_edges` continues the arm) go wide
-  (`Game::set_screen_width`); title, story etc. stay 320.
+  the control panel (`Surface::extend_edges` continues the arm) and the
+  Keen 4/5 help screens (background only) go wide
+  (`Game::set_screen_width`); title, story etc. stay 320. The help menu's
+  hand can point at the HELP! title: `NEW_HELP` in text.rs, the pages about
+  this version (keep it current when adding features).
 - `--classic` (`Options::classic`) switches the additions off: it implies
   `classic_view` and `no_auto_save`, hides MIDI MUSIC and the volume bars
   of the sound/music cards and disables

@@ -100,7 +100,7 @@ The defaults are the original ones and can be changed in the in-game menu
 | Arrow keys (Home/PgUp/End/PgDn for diagonals) | move, look up/down, enter doors |
 | Enter | status window |
 | Esc / F2–F7 | control panel (new game, load/save, options, …); in Keen 6 also F1 |
-| F1 (Keen 4/5) | help screens |
+| F1 (Keen 4/5) | help screens; move the hand up onto the HELP! title and press Enter for a help section about everything new in this version (not with `--classic`) |
 | Pause | pause |
 | Ctrl+Q | quit |
 | F11 or Cmd+F (macOS) / Win+F | toggle fullscreen |
@@ -182,8 +182,9 @@ immediately.
   box stays in the top left corner.
 - The ID Software intro (COMMANDER KEEN flying in and zooming out) and the
   control panel fill the whole width; the arm around the menu computer is
-  continued to the edges. The title, story and the other full-screen
-  pictures are shown 4:3 with borders.
+  continued to the edges. The Keen 4/5 help screens fill the width with
+  their background, the pages stay centered. The title, story and the
+  other full-screen pictures are shown 4:3 with borders.
 - Keen stays in the middle of the screen. Enemies wake up when they come into
   the wider view, so the game plays slightly differently than in the
   original.

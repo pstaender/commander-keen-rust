@@ -48,6 +48,108 @@ const H_BOTTOMINFOPIC: i32 = 0x1f;
 const H_BOTTOMWINDOWPIC: i32 = 0x20;
 /// Keen 5: StartMusic argument of the help screens
 const HELPMUSIC: i32 = 19;
+/// help_menu results: Escape, and the hand on the HELP title (the new
+/// features, not in the original)
+const HELPEXIT: i32 = -100;
+const NEWHELP: i32 = -1;
+
+/// The help pages about this version (not in the original), written like
+/// the ComputerWrist help: `{H}` heading colour, `{B}` text colour, `{T}`
+/// title colour, `{D}` the page decoration, `{K}` the program name.
+const NEW_HELP: &str = r#"^P
+{D}{T}WHAT'S NEW
+{B}
+This version of Commander Keen runs on today's computers, and it has learned a few new tricks along the way. Don't worry: the creatures, the levels and their secrets are just as they always were.
+
+Use the arrow keys to page forward and backward. When you are done reading the text, press Esc.
+
+Press the right arrow key now to go on.
+^P
+{D}{H}WIDESCREEN
+{B}
+Keen no longer has to peek at his world through a little box. Make the window as wide as you like, or switch to fullscreen, and you will see more of the level around you. The ComputerWrist and the id intro stretch along with it.
+
+Press F11 (or Cmd+F on a Mac, Win+F on Windows) to switch between a window and fullscreen.
+^P
+{D}{H}GAMEPADS
+{B}
+If you plug in a gamepad, the Configure menu shows Use Gamepad instead of the joystick choices. There you can set up the movement and the buttons for jump, pogo, fire, the ComputerWrist, saving and loading. Default Layout puts everything back the way it was.
+
+To set a button, move to it, press Enter, then press the button on the gamepad. Pressing Space, or the button it already has, clears it.
+^P
+{D}{H}GAMEPADS (cont'd.)
+{B}
+In the ComputerWrist the gamepad moves the hand, the jump button chooses an item, and the pogo, Start or Select buttons back out.  When the ComputerWrist asks a question, the fire button means "yes".
+
+No calibration is needed.  Even cheap gamepads that the computer doesn't know work fine.
+^P
+{D}{H}QUICK SAVE
+{B}
+Is that last jump giving you trouble? Press the gamepad's Save State button to save the game right where you are, and Load State brings you back there. You can also load the quick save from Load Game: press the down arrow key past the last game, and you will find it on the second page.
+^P
+{D}{H}AUTOSAVE
+{B}
+Every five seconds your game is saved quietly in the background. If your computer crashes, or you just quit, Keen will ask you whether you want to resume your last game the next time you start. He won't save while he is being eaten, of course!
+
+The autosave is on the second page of Load Game, too.
+^P
+{D}{H}MUSIC AND SOUND
+{B}
+Choices for Music are now none, Adlib/Sound Blaster, and MIDI Music. MIDI Music plays the same tunes with the instruments of a SoundFont (a .sf2 file in the game's directory). If there is no SoundFont, MIDI Music will have an "X" by it.
+
+The Sound and Music menus both have a Volume bar. Move to it and press the left and right arrow keys to make things quieter or louder.
+^P
+{D}{H}COMMAND LINE PARAMETERS
+{B}
+Here are some new command line parameters:
+  {K} --fullscreen  (Start in fullscreen.)
+  {K} --windowed  (Start in a window.)
+  {K} --window-scale 4  (Make the window four times as big.)
+  {K} --classic-view  (Keep the original narrow view.)
+  {K} --classic  (Play the game just as it was in 1991, with none of the new features.)
+^P
+{D}{H}COMMAND LINE PARAMETERS (cont'd.)
+{B}
+  {K} --no-auto-save  (Don't save the game every five seconds.)
+  {K} --level 3  (Jump right into level 3.)
+  {K} --difficulty hard  (Use with --level: easy, normal or hard.)
+  {K} --cheatmode  (Cheat Options in the ComputerWrist.)
+  {K} --maps DIR  (Play the levels you made with the Commander Keen Editor.)
+^P
+{D}{H}COMMAND LINE PARAMETERS (cont'd.)
+{B}
+  {K} --audio-pack DIR  (New sound effects and music.)
+  {K} --gfx-pack DIR  (High resolution graphics.)
+  {K} --soundfont FILE  (The SoundFont for MIDI Music.)
+  {K} --export-midi DIR  (Write the music out as MIDI files.)
+  {K} --export-sfx DIR  (Write the sound effects out as WAV files.)
+  {K} --help  (Show all of the parameters.)
+^P
+{D}{C}CONCLUSION
+{B}
+Now go try out the new tricks, and have fun playing "{N}"!
+^E
+"#;
+
+/// The new help pages with the colours and decoration of the episode's
+/// help texts.
+fn new_help_text() -> Vec<u8> {
+    let (h, b, t, d, k, n) = if super::EPISODE == 5 {
+        ("^cb", "^ce", "^cF", "", "keen5", "The Armageddon Machine")
+    } else {
+        ("^c4", "^c8", "^c9", "^G184,108,11\n", "keen4", "Secret of the Oracle")
+    };
+    let c = if super::EPISODE == 5 { "^cF" } else { "^C2" };
+    NEW_HELP
+        .replace("{H}", h)
+        .replace("{B}", b)
+        .replace("{T}", t)
+        .replace("{C}", c)
+        .replace("{D}", d)
+        .replace("{K}", k)
+        .replace("{N}", n)
+        .into_bytes()
+}
 
 /// Module-private state stored in `Game::text` (the CK_TEXT globals).
 #[derive(Default, Clone)]
@@ -545,23 +647,24 @@ impl Game {
     /// HelpMenu (K4 0x192a2, K5 0x1e854): the topic menu of the help
     /// screens; returns the topic or -1 (Escape).
     fn help_menu(&mut self) -> i32 {
-        self.sys.surface.bar(0, 0, 320, 200, BACKCOLOR);
-        if super::EPISODE == 5 {
-            self.draw_pic(0, 0, H_TOPWINDOWPIC);
-            self.draw_pic(0, 8, H_LEFTWINDOWPIC);
-            self.draw_pic(312, 8, H_RIGHTWINDOWPIC);
-            self.draw_pic(8, 192, H_BOTTOMWINDOWPIC);
-        }
-        self.draw_pic(96, 8, H_HELPPIC);
+        self.draw_help_menu();
         let mut ycursor: i32 = 0;
+        // the hand can point at the HELP title: the new features (not in
+        // the original, not with --classic)
+        let first = if self.opts.classic { 0 } else { NEWHELP };
         self.sys.input.clear_keys_down();
         loop {
             if !self.alive() {
                 return -1;
             }
+            // follow window resizes
+            if self.set_screen_width(true) {
+                self.sys.surface.clear(BACKCOLOR);
+                self.draw_help_menu();
+            }
             let t = &mut self.text;
-            if t.helpmenupos < 0 {
-                t.helpmenupos = 0;
+            if t.helpmenupos < first {
+                t.helpmenupos = first;
             } else if t.helpmenupos > 4 {
                 t.helpmenupos = 4;
             }
@@ -580,7 +683,7 @@ impl Game {
                     crate::engine::input::SC_DOWNARROW => self.text.helpmenupos += 1,
                     crate::engine::input::SC_ESCAPE => {
                         self.sys.surface.clear(BACKCOLOR);
-                        return -1;
+                        return HELPEXIT;
                     }
                     crate::engine::input::SC_ENTER => {
                         self.sys.surface.clear(BACKCOLOR);
@@ -604,10 +707,32 @@ impl Game {
         }
     }
 
+    /// The background, border and title of the help menu.
+    fn draw_help_menu(&mut self) {
+        self.sys.surface.bar(0, 0, 320, 200, BACKCOLOR);
+        if super::EPISODE == 5 {
+            self.draw_pic(0, 0, H_TOPWINDOWPIC);
+            self.draw_pic(0, 8, H_LEFTWINDOWPIC);
+            self.draw_pic(312, 8, H_RIGHTWINDOWPIC);
+            self.draw_pic(8, 192, H_BOTTOMWINDOWPIC);
+        }
+        self.draw_pic(96, 8, H_HELPPIC);
+    }
+
     /// HelpScreens (K4 0x1941b, K5 0x1ea5d): F1 help, a topic menu and the
     /// pages of the chosen text (arrows / PgUp / PgDn, Escape back to the
     /// menu, Escape in the menu leaves). Keen 5 plays its help music.
+    /// Not in the original: the screen is as wide as the window (the gray
+    /// fills it, the pages stay centered), and the topic above the first
+    /// one shows what is new in this version.
     pub fn help_screens(&mut self) {
+        let was_wide = self.sys.surface.logical_w() != 320;
+        self.set_screen_width(true);
+        self.help_screens_inner();
+        self.set_screen_width(was_wide);
+    }
+
+    fn help_screens_inner(&mut self) {
         use crate::engine::input::*;
         self.sys.surface.clear(BACKCOLOR);
         if super::EPISODE == 5 {
@@ -616,7 +741,7 @@ impl Game {
         loop {
             let n = self.help_menu();
             self.sys.surface.clear(BACKCOLOR);
-            if n == -1 || !self.alive() {
+            if n == HELPEXIT || !self.alive() {
                 self.sys.input.clear_keys_down();
                 self.sys.surface.clear(BACKCOLOR);
                 if super::EPISODE == 5 {
@@ -624,8 +749,12 @@ impl Game {
                 }
                 return;
             }
-            let chunk = HELPEXTERN[n as usize];
-            self.text.buf = self.data.gfx.externs.get(chunk - STARTEXTERNS).cloned().unwrap_or_default();
+            self.text.buf = if n == NEWHELP {
+                new_help_text()
+            } else {
+                let chunk = HELPEXTERN[n as usize];
+                self.data.gfx.externs.get(chunk - STARTEXTERNS).cloned().unwrap_or_default()
+            };
             self.text.pos = 0;
             self.cache_layout_graphics();
             let mut newpage = true;
@@ -639,8 +768,20 @@ impl Game {
                     self.sys.present(); // VW_SetScreen(bufferofs, 0)
                 }
                 self.sys.input.last_scan = 0;
+                let mut resized = false;
                 while self.sys.input.last_scan == 0 && self.alive() {
                     self.sys.wait_vbl(1);
+                    if self.set_screen_width(true) {
+                        resized = true;
+                        break;
+                    }
+                }
+                if resized {
+                    // lay the same page out again on the new screen
+                    self.sys.surface.clear(BACKCOLOR);
+                    self.back_page();
+                    newpage = true;
+                    continue;
                 }
                 let ls = self.sys.input.last_scan;
                 match ls {
