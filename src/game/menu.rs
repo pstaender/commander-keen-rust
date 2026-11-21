@@ -78,8 +78,10 @@ const MAXCARDS: usize = 7;
 const MAXSTRING: usize = 128;
 const MAXGAMENAME: usize = 32;
 const MAXSAVEGAMES: usize = 6;
-/// autosave interval (10 s)
-const AUTOSAVE_TICS: i32 = 10 * TICKBASE;
+/// page 2 of the load card (not in the original)
+const LOAD_EXTRA: [&str; 2] = ["QUICK SAVE", "AUTOSAVE"];
+/// autosave interval (5 s)
+const AUTOSAVE_TICS: i32 = 5 * TICKBASE;
 
 // card numbers (the UserItemGroups of the original)
 const ROOTCARD: usize = 0;
@@ -396,6 +398,11 @@ pub struct ModState {
     games: Vec<SaveSlot>,
     /// --cheatmode quick save/load (F2/F3): the slot last loaded or saved
     quickslot: Option<usize>,
+    /// load card page: 0 = the six saved games, 1 = quick save and
+    /// autosave (not in the original)
+    load_page: usize,
+    /// page 2 of the load card: the quick save / autosave files exist
+    extra_present: [bool; 2],
     /// SVGA compatibility (no effect in this port)
     pub compatibility: bool,
     /// Keen 5 "FIX JERKY MOTION" (K5 DS:0x6f12, jerk)
@@ -421,6 +428,8 @@ impl Default for ModState {
             py: 0,
             games: vec![SaveSlot::default(); MAXSAVEGAMES],
             quickslot: None,
+            load_page: 0,
+            extra_present: [false; 2],
             compatibility: false,
             jerk: false,
             controltype: 0,
@@ -649,6 +658,9 @@ impl Game {
     }
 
     fn cp_nitems(&self, c: usize) -> usize {
+        if c == LOADCARD && self.menu.load_page == 1 {
+            return LOAD_EXTRA.len();
+        }
         self.menu.cards[self.cp_owner(c)].items.len()
     }
 
@@ -1452,20 +1464,65 @@ impl Game {
         self.usl_draw_ctl_panel();
     }
 
+    /// Load card: the disabled flags of the entries of the current page.
+    fn usl_load_flags(&mut self) {
+        self.menu.extra_present = [self.state_path().exists(), self.autosave_path().exists()];
+        for n in 0..MAXSAVEGAMES {
+            let present = if self.menu.load_page == 1 {
+                n < LOAD_EXTRA.len() && self.menu.extra_present[n]
+            } else {
+                self.menu.games[n].present
+            };
+            let it = &mut self.menu.cards[LOADCARD].items[n];
+            if present {
+                it.flags &= !UI_DISABLED;
+            } else {
+                it.flags |= UI_DISABLED;
+            }
+        }
+    }
+
+    /// Load card: shows page `page` with the cursor on entry `cursor`.
+    fn usl_load_set_page(&mut self, page: usize, cursor: usize) {
+        for it in self.menu.cards[LOADCARD].items.iter_mut() {
+            it.flags &= !UI_SELECTED;
+        }
+        self.menu.load_page = page;
+        self.usl_load_flags();
+        self.usl_select_item(LOADCARD, cursor, false);
+        self.usl_draw_ctl_panel();
+    }
+
+    /// Loads the quick save (0) or the autosave (1) from page 2 of the
+    /// load card, like USL_DoLoadGame.
+    fn usl_do_load_extra(&mut self, i: usize) {
+        if !self.usl_confirm_comm(UC_LOADED) {
+            return;
+        }
+        let path = if i == 0 { self.state_path() } else { self.autosave_path() };
+        self.usl_show_load_save("Loading", LOAD_EXTRA[i.min(1)]);
+        match self.load_game_path(&path) {
+            Ok(()) => {
+                self.loadedgame = true;
+                // the game is paused after loading (Paused = true)
+                self.sys.input.paused = true;
+            }
+            Err(e) => {
+                self.usl_handle_error(&e);
+                self.menu.comm = 0;
+                self.menu.done = false;
+            }
+        }
+        self.usl_draw_ctl_panel();
+    }
+
     /// USL_LoadCustom (0x2a650)
     fn usl_load_custom(&mut self, call: i32, i: Option<usize>) -> bool {
         match call {
             UIC_SETUPCARD => {
                 self.usl_uid_check();
-                for n in 0..MAXSAVEGAMES {
-                    let present = self.menu.games[n].present;
-                    let it = &mut self.menu.cards[LOADCARD].items[n];
-                    if present {
-                        it.flags &= !UI_DISABLED;
-                    } else {
-                        it.flags |= UI_DISABLED;
-                    }
-                }
+                self.menu.load_page = 0;
+                self.usl_load_flags();
                 false
             }
             UIC_DRAWICON => {
@@ -1481,15 +1538,23 @@ impl Game {
                     (it.x, it.y)
                 };
                 self.cp_bar(ix + 1, iy + 2, 0x92, 7, BACKCOLOR);
-                let present = self.menu.games[i].present;
+                let (present, name) = if top == LOADCARD && self.menu.load_page == 1 {
+                    (self.menu.extra_present[i], LOAD_EXTRA[i].to_string())
+                } else {
+                    (self.menu.games[i].present, self.menu.games[i].name.clone())
+                };
                 self.menu.px = if present { ix + 2 } else { ix + 0x3c };
                 self.menu.py = iy + 2;
-                let s = if present { self.menu.games[i].name.clone() } else { "Empty".to_string() };
+                let s = if present { name } else { "Empty".to_string() };
                 self.cp_draw_string(&s);
                 true
             }
             UIC_HIT => {
-                self.usl_do_load_game(i.unwrap_or(0));
+                if self.menu.load_page == 1 {
+                    self.usl_do_load_extra(i.unwrap_or(0));
+                } else {
+                    self.usl_do_load_game(i.unwrap_or(0));
+                }
                 true
             }
             _ => false,
@@ -1836,6 +1901,11 @@ impl Game {
     fn usl_next_item(&mut self) {
         let top = self.cp_top();
         let cur = self.menu.cards[top].cursor;
+        // load card: down from the last entry turns the page
+        if top == LOADCARD && cur + 1 >= self.cp_nitems(top) {
+            self.usl_load_set_page(1 - self.menu.load_page, 0);
+            return;
+        }
         if cur + 1 < self.cp_nitems(top) {
             self.usl_select_item(top, cur + 1, true);
         }
@@ -1845,6 +1915,13 @@ impl Game {
     fn usl_prev_item(&mut self) {
         let top = self.cp_top();
         let cur = self.menu.cards[top].cursor;
+        // load card: up from the first entry turns the page
+        if top == LOADCARD && cur == 0 {
+            let page = 1 - self.menu.load_page;
+            let last = if page == 0 { MAXSAVEGAMES } else { LOAD_EXTRA.len() } - 1;
+            self.usl_load_set_page(page, last);
+            return;
+        }
         if cur != 0 {
             self.usl_select_item(top, cur - 1, true);
         }
@@ -1869,6 +1946,7 @@ impl Game {
 
     /// USL_DownLevel (0x2b193)
     fn usl_down_level(&mut self, c: usize) {
+        self.menu.load_page = 0;
         self.usl_push_card(c);
         if self.usl_custom(c, UIC_SETUPCARD, None) {
             self.usl_pop_card();
@@ -2121,6 +2199,14 @@ impl Game {
                     }
                     SC_RETURN => {
                         self.usl_do_item();
+                        resetitem = true;
+                    }
+                    // load card: left / right switch the page
+                    SC_LEFTARROW | SC_RIGHTARROW if self.cp_top() == LOADCARD => {
+                        let p = (ls == SC_RIGHTARROW) as usize;
+                        if p != self.menu.load_page {
+                            self.usl_load_set_page(p, 0);
+                        }
                         resetitem = true;
                     }
                     SC_ESCAPE => {
@@ -2568,7 +2654,7 @@ impl Game {
     /// Gamepad SAVE STATE (not in the original).
     pub fn save_state(&mut self) {
         let path = self.state_path();
-        let r = self.save_game_path(&path, "GAMEPAD STATE");
+        let r = self.save_game_path(&path, "QUICK SAVE");
         self.quick_message("State saved", r);
     }
 
@@ -2613,9 +2699,13 @@ impl Game {
         self.gs.riding = riding;
     }
 
-    /// From the play loop: autosaves every `AUTOSAVE_TICS`.
+    /// From the play loop: autosaves every `AUTOSAVE_TICS`, but not while
+    /// Keen is dying (the autosave keeps the moment before).
     pub fn autosave_tick(&mut self) {
-        if self.playstate == EX_STILLPLAYING && self.sys.time_count() - self.autosave_time >= AUTOSAVE_TICS {
+        if self.playstate == EX_STILLPLAYING
+            && self.sys.time_count() - self.autosave_time >= AUTOSAVE_TICS
+            && !self.keen_dying()
+        {
             self.autosave();
         }
     }

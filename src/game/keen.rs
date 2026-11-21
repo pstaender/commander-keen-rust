@@ -153,6 +153,18 @@ impl Game {
         false
     }
 
+    /// Keen was killed: dying, dead or (Keen 4) eaten by the dopefish. Not
+    /// in the original (the autosave skips these moments).
+    pub fn keen_dying(&self) -> bool {
+        let s = self.objs[self.player].state;
+        #[allow(unused_mut)]
+        let mut d = same(s, &S_KEENDIE1) || same(s, &S_KEENDIE2) || same(s, &S_KEENDEAD);
+        ep4! {
+            d |= same(s, &S_KEENSWIMDIE1) || same(s, &S_KEENSWIMDIE2) || same(s, &S_KEENEATEN1) || same(s, &S_KEENEATEN2);
+        }
+        d
+    }
+
     /// KillKeen (0x1b557)
     pub fn kill_keen(&mut self) {
         let p = self.player;

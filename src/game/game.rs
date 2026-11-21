@@ -247,7 +247,7 @@ impl Game {
         if self.alive() {
             // the game ended (game over, won, END GAME): nothing to resume
             self.discard_autosave();
-        } else if self.playstate == EX_STILLPLAYING {
+        } else if self.playstate == EX_STILLPLAYING && !self.keen_dying() {
             // the program is quit in the middle of a game
             self.autosave();
         }

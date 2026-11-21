@@ -22,7 +22,7 @@ const USAGE: &str = "keenN [options]
   --system-shortcuts keep the macOS keyboard shortcuts (Ctrl+arrows switch
                      Spaces) while the game window has focus
   --nosound          disable audio output
-  --no-auto-save     do not save the running game every 10 seconds (by
+  --no-auto-save     do not save the running game every 5 seconds (by
                      default it is saved to saves/AUTOSAVE.CKN and offered
                      to resume at the next start)
   --level N          start directly in map N
