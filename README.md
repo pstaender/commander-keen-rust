@@ -118,7 +118,7 @@ rebind movement and buttons (Enter, then press the button or move the
 stick; Esc cancels, Backspace clears). The left stick always moves too. Pads without a known mapping work as
 well: their d-pad/stick moves, and any button can be bound in the menu.
 In the control panel the gamepad navigates: d-pad/stick, A = select,
-B/Start = back.
+B/Start/Select = back.
 
 ### Debug keys (`--debug-shortcuts`)
 

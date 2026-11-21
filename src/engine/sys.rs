@@ -168,6 +168,10 @@ pub struct Sys {
     pad_axis_prev: std::collections::HashMap<u32, f32>,
     /// KEEN_PAD_DEBUG=1: print the gamepad events
     pad_debug: bool,
+    /// d-pads that are an axis pair mapped as buttons (see `dpad_axis`):
+    /// the codes of those axes and the (x, y) direction per pad
+    pad_dpad_codes: std::collections::HashSet<u32>,
+    pad_dpad: std::collections::HashMap<usize, [i8; 2]>,
     pub surface: Surface,
     pub palette: Palette,
     pub border: u8,
@@ -239,6 +243,8 @@ impl Sys {
             pad_prev: [false; super::input::PAD_ACTIONS],
             pad_axis_prev: Default::default(),
             pad_debug: std::env::var("KEEN_PAD_DEBUG").is_ok_and(|v| v == "1"),
+            pad_dpad_codes: Default::default(),
+            pad_dpad: Default::default(),
             surface,
             palette: Palette::default(),
             border: 0,
@@ -401,12 +407,49 @@ impl Sys {
         let mut captured = None;
         // raw buttons of unmapped pads pressed in this poll
         let (mut raw_face, mut raw_other) = (false, false);
+        let mut select = false;
         while let Some(ev) = g.next_event() {
             if self.pad_debug {
                 let pad = g.gamepad(ev.id);
                 eprintln!("pad {} \"{}\" ({:?} mapping): {:?}", usize::from(ev.id), pad.name(), pad.mapping_source(), ev.event);
             }
+            // a d-pad axis mapped as buttons: one button name for both
+            // directions, the value gives the direction
+            let btn_ev = match ev.event {
+                EventType::ButtonChanged(b, v, code) => Some((b, Some(v), code.into_u32())),
+                EventType::ButtonPressed(b, code) | EventType::ButtonReleased(b, code) => Some((b, None, code.into_u32())),
+                _ => None,
+            };
+            if let Some((b, v, c)) = btn_ev {
+                let vertical = matches!(b, Button::DPadUp | Button::DPadDown);
+                if (vertical || matches!(b, Button::DPadLeft | Button::DPadRight))
+                    && (dpad_axis(c) || self.pad_dpad_codes.contains(&c) || v.is_some_and(|v| v > 0.1 && v < 0.9))
+                {
+                    self.pad_dpad_codes.insert(c);
+                    if let Some(v) = v {
+                        // HID axes: the maximum is right / down
+                        let dir = if v > 0.75 { 1 } else if v < 0.25 { -1 } else { 0 };
+                        let d = self.pad_dpad.entry(usize::from(ev.id)).or_default();
+                        let old = std::mem::replace(&mut d[vertical as usize], dir);
+                        if dir != 0 && old != dir {
+                            let btn = match (vertical, dir > 0) {
+                                (false, false) => 15,
+                                (false, true) => 16,
+                                (true, false) => 13,
+                                (true, true) => 14,
+                            };
+                            captured = captured.or(Some(PadInput::Button(btn)));
+                        }
+                    }
+                    // the pressed / released events name the wrong direction
+                    continue;
+                }
+            }
             match ev.event {
+                EventType::ButtonPressed(Button::Select, _) => {
+                    select = true;
+                    captured = captured.or(Some(PadInput::Button(8)));
+                }
                 EventType::ButtonPressed(Button::Unknown, code) => {
                     let c = code.into_u32();
                     captured = captured.or(Some(PadInput::RawButton(c)));
@@ -437,9 +480,10 @@ impl Sys {
         }
         i.pad_connected = g.gamepads().next().is_some();
         let mut act = [false; PAD_ACTIONS];
-        for (_, pad) in g.gamepads() {
+        for (id, pad) in g.gamepads() {
+            let dpad = self.pad_dpad.get(&usize::from(id)).copied().unwrap_or_default();
             for (k, &b) in i.pad_map.iter().enumerate() {
-                act[k] |= pad_active(&pad, b);
+                act[k] |= pad_active(&pad, b, dpad, &self.pad_dpad_codes);
             }
             let (ax, ay) = if pad.mapping_source() == MappingSource::None {
                 // unmapped: the raw X/Y axes or the hat switch (HID: down
@@ -482,6 +526,10 @@ impl Sys {
                 if pressed(k) {
                     i.last_scan = sc;
                 }
+            }
+            // SELECT backs out as well (unless bound to an action)
+            if select && !i.pad_map.contains(&PadInput::Button(8)) {
+                i.last_scan = SC_ESCAPE;
             }
             // unmapped pad whose buttons are not configured yet
             if !i.pad_map.iter().any(|b| matches!(b, PadInput::RawButton(_))) {
@@ -657,14 +705,41 @@ const PAD_AXES: [gilrs::Axis; 8] = {
     [LeftStickX, LeftStickY, RightStickX, RightStickY, LeftZ, RightZ, DPadX, DPadY]
 };
 
+/// Whether a code is a HID axis (generic desktop page, not one of the
+/// d-pad button usages 0x90..0x93), i.e. a d-pad "button" on it is half
+/// of an axis (macOS codes; elsewhere detected by fractional values).
+fn dpad_axis(c: u32) -> bool {
+    cfg!(target_os = "macos") && c >> 16 == 1 && !(0x90..=0x93).contains(&(c & 0xffff))
+}
+
 /// Whether a bound gamepad input is held. A d-pad button also reads the
-/// d-pad axes (some pads report the d-pad as a hat).
-fn pad_active(pad: &gilrs::Gamepad, b: super::input::PadInput) -> bool {
+/// d-pad axes (some pads report the d-pad as a hat) or, for a d-pad that
+/// is an axis pair mapped as buttons, the (x, y) direction `dpad` tracked
+/// from its events.
+fn pad_active(
+    pad: &gilrs::Gamepad,
+    b: super::input::PadInput,
+    dpad: [i8; 2],
+    dpad_codes: &std::collections::HashSet<u32>,
+) -> bool {
     use super::input::PadInput;
     match b {
         PadInput::None => false,
         PadInput::Button(c) => {
             let Some(&btn) = PAD_BUTTONS.get(c as usize) else { return false };
+            // the mapping may name only one button of the axis (the
+            // Retrolink SNES pad reports up and down both as DPadUp)
+            let pair = if c <= 14 { [gilrs::Button::DPadUp, gilrs::Button::DPadDown] } else { [gilrs::Button::DPadLeft, gilrs::Button::DPadRight] };
+            if (13..=16).contains(&c)
+                && pair.iter().any(|&p| pad.button_code(p).is_some_and(|code| dpad_codes.contains(&code.into_u32())))
+            {
+                return match c {
+                    13 => dpad[1] < 0,
+                    14 => dpad[1] > 0,
+                    15 => dpad[0] < 0,
+                    _ => dpad[0] > 0,
+                };
+            }
             let hat = match c {
                 13 => pad.value(gilrs::Axis::DPadY) > 0.5,
                 14 => pad.value(gilrs::Axis::DPadY) < -0.5,
