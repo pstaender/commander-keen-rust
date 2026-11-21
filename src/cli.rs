@@ -22,6 +22,9 @@ const USAGE: &str = "keenN [options]
   --system-shortcuts keep the macOS keyboard shortcuts (Ctrl+arrows switch
                      Spaces) while the game window has focus
   --nosound          disable audio output
+  --no-auto-save     do not save the running game every 10 seconds (by
+                     default it is saved to saves/AUTOSAVE.CKN and offered
+                     to resume at the next start)
   --level N          start directly in map N
   --difficulty D     difficulty for --level: easy, normal (default), hard
   --maps DIR         load GAMEMAPS.CKn (and MAPHEAD.CKn) from DIR, e.g.
@@ -73,6 +76,7 @@ pub fn main(default_dir: &str) {
             "--windowed" => opts.fullscreen = Some(false),
             "--classic-view" => opts.classic_view = true,
             "--cheatmode" => opts.cheatmode = true,
+            "--no-auto-save" => opts.no_auto_save = true,
             "--difficulty" => {
                 opts.start_difficulty = match next(&mut i).to_ascii_lowercase().as_str() {
                     "easy" | "1" => Some(1),

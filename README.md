@@ -75,6 +75,7 @@ case-insensitively.
 | `--fullscreen` / `--windowed` | start fullscreen or in a window (otherwise the last used mode from `config.txt`) |
 | `--no-aspect` | don't stretch 320×200 to 4:3 |
 | `--classic-view` | keep the original 320×200 play field instead of widening it to the screen |
+| `--no-auto-save` | turn off the autosave (every 10 s to `saves/AUTOSAVE.CKn`; after a crash, kill or quit the game offers to resume it at the next start) |
 | `--system-shortcuts` | macOS: keep the system keyboard shortcuts active while the game has focus (see below) |
 | `--nosound` | disable audio output |
 | `--level N` | start directly in map N (0 = world map) |

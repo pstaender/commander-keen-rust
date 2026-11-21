@@ -705,6 +705,7 @@ impl Game {
                 self.lasttimecount = self.sys.time_count();
             }
         }
+        self.autosave_tick();
         // gamepad SAVE STATE / LOAD STATE (not in the original)
         let (save, load) = (std::mem::take(&mut self.sys.input.pad_save), std::mem::take(&mut self.sys.input.pad_load));
         if !self.storedemo && self.demomode == 0 && (save || load) {

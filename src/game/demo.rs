@@ -1651,6 +1651,11 @@ impl Game {
             return;
         }
         self.playstate = EX_STILLPLAYING;
+        // autosave: continue the game that was running when the program
+        // ended (killed, crashed or quit)
+        if self.offer_resume() {
+            self.run_chosen_games();
+        }
         let mut i = 0;
         while self.alive() {
             let n = i;

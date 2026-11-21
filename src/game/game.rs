@@ -238,7 +238,19 @@ impl Game {
     /// GameLoop with the wide view enabled while it runs.
     pub fn game_loop(&mut self) {
         self.wide_ok = true;
+        // autosave: a new game replaces the one saved before
+        if self.playstate != EX_LOADEDGAME {
+            self.discard_autosave();
+        }
+        self.autosave_time = self.sys.time_count();
         self.game_loop_inner();
+        if self.alive() {
+            // the game ended (game over, won, END GAME): nothing to resume
+            self.discard_autosave();
+        } else if self.playstate == EX_STILLPLAYING {
+            // the program is quit in the middle of a game
+            self.autosave();
+        }
         self.wide_ok = false;
         self.update_view();
     }
@@ -365,6 +377,7 @@ impl Game {
                     }
                 }
                 EX_RESETGAME => {
+                    self.discard_autosave();
                     if self.restartdifficulty != 0 {
                         self.gs.difficulty = self.restartdifficulty;
                     }

@@ -78,6 +78,8 @@ const MAXCARDS: usize = 7;
 const MAXSTRING: usize = 128;
 const MAXGAMENAME: usize = 32;
 const MAXSAVEGAMES: usize = 6;
+/// autosave interval (10 s)
+const AUTOSAVE_TICS: i32 = 10 * TICKBASE;
 
 // card numbers (the UserItemGroups of the original)
 const ROOTCARD: usize = 0;
@@ -2373,7 +2375,10 @@ impl Game {
         if let Some(d) = path.parent() {
             std::fs::create_dir_all(d).map_err(|e| io_error_text(&e))?;
         }
-        std::fs::write(path, &w.0).map_err(|e| io_error_text(&e))
+        // write a temporary file first: a crash never leaves half a save
+        let tmp = path.with_extension("tmp");
+        std::fs::write(&tmp, &w.0).map_err(|e| io_error_text(&e))?;
+        std::fs::rename(&tmp, path).map_err(|e| io_error_text(&e))
     }
 
     fn parse_saved_game(&self, d: &[u8]) -> Result<LoadedGame, String> {
@@ -2572,6 +2577,98 @@ impl Game {
             self.rf_refresh();
         }
         self.quick_message("State loaded", r);
+    }
+
+    // ---- autosave (not in the original) --------------------------------------
+
+    fn autosave_path(&self) -> PathBuf {
+        self.data.dir.join("saves").join(format!("AUTOSAVE.{}", super::LAYOUT.ext))
+    }
+
+    /// Autosave is on unless --no-auto-save, not with --level (a test run
+    /// of a map) and not in demos.
+    fn autosave_enabled(&self) -> bool {
+        !self.opts.no_auto_save && self.opts.start_level.is_none() && !self.storedemo && self.demomode == 0
+    }
+
+    /// Saves the running game to AUTOSAVE.CKn without a message. The
+    /// game continues unchanged (SaveTheGame drops a platform ride).
+    pub fn autosave(&mut self) {
+        if !self.autosave_enabled() {
+            return;
+        }
+        self.autosave_time = self.sys.time_count();
+        let riding = self.gs.riding;
+        let path = self.autosave_path();
+        if let Err(e) = self.save_game_path(&path, "AUTOSAVE") {
+            eprintln!("autosave failed: {}", e);
+        }
+        self.gs.riding = riding;
+    }
+
+    /// From the play loop: autosaves every `AUTOSAVE_TICS`.
+    pub fn autosave_tick(&mut self) {
+        if self.playstate == EX_STILLPLAYING && self.sys.time_count() - self.autosave_time >= AUTOSAVE_TICS {
+            self.autosave();
+        }
+    }
+
+    /// Removes the autosave (the game ended or a new one started).
+    pub fn discard_autosave(&mut self) {
+        if self.autosave_enabled() {
+            let _ = std::fs::remove_file(self.autosave_path());
+        }
+    }
+
+    /// At the start: if an autosave exists, asks whether to resume it and
+    /// loads it (paused). True if a game was loaded.
+    pub fn offer_resume(&mut self) -> bool {
+        if !self.autosave_enabled() {
+            return false;
+        }
+        let path = self.autosave_path();
+        let Ok(d) = std::fs::read(&path) else { return false };
+        if self.parse_saved_game(&d).is_err() {
+            return false;
+        }
+        self.sys.surface.clear(0);
+        self.us_center_window(26, 5);
+        let (_, h) = self.measure_string(b"A");
+        self.tw.printy = self.tw.windowy + ((self.tw.windowh - 3 * h) >> 1);
+        self.us_cprint("Resume your last game?\n\nY = yes      N = no");
+        self.sys.present();
+        self.sys.input.clear_keys_down();
+        // a gamepad answers with jump (yes) or pogo / menu (no)
+        self.sys.input.pad_menu_nav = true;
+        let yes = loop {
+            if !self.alive() {
+                break false;
+            }
+            self.sys.wait_vbl(1);
+            match self.sys.input.last_scan {
+                SC_Y | SC_RETURN => break true,
+                SC_N | SC_ESCAPE => break false,
+                _ => {}
+            }
+        };
+        self.sys.input.pad_menu_nav = false;
+        self.sys.input.clear_keys_down();
+        self.sys.surface.clear(0);
+        self.sys.present();
+        if !yes {
+            return false;
+        }
+        match self.load_game_path(&path) {
+            Ok(()) => {
+                // like a game loaded in the control panel: paused
+                self.sys.input.paused = true;
+                true
+            }
+            Err(e) => {
+                eprintln!("could not resume: {}", e);
+                false
+            }
+        }
     }
 
     /// Short in-game box after a quick save/load; errors wait for a key.

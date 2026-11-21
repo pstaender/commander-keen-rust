@@ -77,6 +77,8 @@ pub struct Game {
     pub ca_mapon: i32,
     /// in the game loop: the play field may use a wide view
     pub wide_ok: bool,
+    /// TimeCount of the last autosave
+    pub autosave_time: i32,
 
     pub cam: Camera,
     pub rf: RfState,
@@ -161,6 +163,7 @@ impl Game {
             mapname: String::new(),
             ca_mapon: -1,
             wide_ok: false,
+            autosave_time: 0,
             cam: Camera::default(),
             rf: RfState::default(),
             lastpoletime: 0,
