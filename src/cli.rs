@@ -12,7 +12,14 @@ const USAGE: &str = "keenN [options]
                      episode is detected from the files; default: KEENN)
   --gfx-pack DIR     high resolution graphics replacement pack
   --audio-pack DIR   replacement sound effects (sfx/NN.ogg) and music (music/NN.ogg|.mid)
-  --soundfont FILE   SoundFont used for .mid replacement music
+  --soundfont FILE   SoundFont (.sf2) for MIDI music (--midi-music and
+                     .mid files of an audio pack)
+  --midi-music       play the music as General MIDI converted from the
+                     original AdLib songs (needs a SoundFont: --soundfont,
+                     or soundfont.sf2 in the data directory or next to
+                     the executable)
+  --export-midi DIR  write the songs as DIR/music/NN.mid (DIR can be used
+                     as --audio-pack after editing them) and exit
   --window-scale N   window size multiplier (default 3)
   --fullscreen       start in fullscreen mode (F11 or Cmd/Win+F toggles)
   --windowed         start in a window
@@ -44,6 +51,8 @@ pub fn main(default_dir: &str) {
     let args: Vec<String> = std::env::args().collect();
     let mut data_dir = PathBuf::from(default_dir);
     let mut dump_dir: Option<PathBuf> = None;
+    let mut midi_dir: Option<PathBuf> = None;
+    let mut midi_music = false;
     let mut gfx_pack: Option<PathBuf> = None;
     let mut audio_pack: Option<PathBuf> = None;
     let mut soundfont: Option<PathBuf> = None;
@@ -66,6 +75,8 @@ pub fn main(default_dir: &str) {
             "--gfx-pack" => gfx_pack = Some(PathBuf::from(next(&mut i))),
             "--audio-pack" => audio_pack = Some(PathBuf::from(next(&mut i))),
             "--soundfont" => soundfont = Some(PathBuf::from(next(&mut i))),
+            "--midi-music" => midi_music = true,
+            "--export-midi" => midi_dir = Some(PathBuf::from(next(&mut i))),
             "--window-scale" => window_scale = next(&mut i).parse().unwrap_or(3),
             "--no-aspect" => aspect = false,
             "--nosound" => sound = false,
@@ -113,16 +124,26 @@ pub fn main(default_dir: &str) {
         }
     };
     if let Ok(spec) = std::env::var("KEEN_RENDER_WAV") {
-        // "song:N:file.wav" or "pc:N:file.wav" / "adlib:N:file.wav"
+        // "song:N:file.wav", "midi:N:file.wav" (--midi-music) or
+        // "pc:N:file.wav" / "adlib:N:file.wav"
         let p: Vec<&str> = spec.split(':').collect();
         let n: usize = p.get(1).and_then(|v| v.parse().ok()).unwrap_or(0);
         let path = std::path::Path::new(p.get(2).copied().unwrap_or("out.wav"));
         let r = match p[0] {
             "song" => crate::engine::sound::render_to_wav(&data.audio, Some(n), None, 20.0, path),
+            "midi" => {
+                let sf = soundfont.clone().or_else(|| crate::engine::sound::find_soundfont(&data_dir)).expect("--midi-music needs a SoundFont (--soundfont FILE)");
+                let table = load_instrument_table(audio_pack.as_deref());
+                crate::engine::sound::render_midi_to_wav(&data.audio, n, &sf, &table, 20.0, path)
+            }
             "pc" => crate::engine::sound::render_to_wav(&data.audio, None, Some((n, crate::engine::sound::SdMode::PC)), 2.0, path),
             _ => crate::engine::sound::render_to_wav(&data.audio, None, Some((n, crate::engine::sound::SdMode::AdLib)), 2.0, path),
         };
         r.expect("render failed");
+        return;
+    }
+    if let Some(d) = midi_dir {
+        export_midi(&data, &d, audio_pack.as_deref()).expect("MIDI export failed");
         return;
     }
     if let Some(d) = dump_dir {
@@ -132,7 +153,13 @@ pub fn main(default_dir: &str) {
     }
     let scale = gfx_pack.as_deref().map(pack_scale).unwrap_or(1);
     let gfx = Gfx::new(&data.gfx, scale, gfx_pack.as_deref());
-    let sd = SoundManager::new(&data.audio, sound && !headless, audio_pack.as_deref(), soundfont.as_deref());
+    if midi_music && soundfont.is_none() {
+        soundfont = crate::engine::sound::find_soundfont(&data_dir);
+    }
+    let mut sd = SoundManager::new(&data.audio, sound && !headless, audio_pack.as_deref(), soundfont.as_deref());
+    if midi_music && !sd.set_midi_music(load_instrument_table(audio_pack.as_deref())) {
+        eprintln!("--midi-music: no SoundFont found (give one with --soundfont FILE.sf2, or put it into the data directory); playing AdLib music");
+    }
     let mut sys = Sys::new(scale, window_scale.max(1), headless, aspect, opts.fullscreen.unwrap_or(false));
     sys.set_grab_hotkeys(!system_shortcuts);
     match data.episode {
@@ -140,4 +167,37 @@ pub fn main(default_dir: &str) {
         Episode::K5 => crate::ck5::run(sys, data, gfx, sd, opts),
         Episode::K6 => crate::ck6::run(sys, data, gfx, sd, opts),
     }
+}
+
+/// `--export-midi DIR`: every song as DIR/music/NN.mid plus a report of the
+/// instruments and the General MIDI programs chosen for them.
+fn export_midi(data: &crate::assets::GameData, dir: &std::path::Path, audio_pack: Option<&std::path::Path>) -> std::io::Result<()> {
+    use crate::assets::midi;
+    let music = dir.join("music");
+    std::fs::create_dir_all(&music)?;
+    let mut report = String::from(
+        "# Instruments of the songs and the General MIDI voices --midi-music uses for them.\n\
+         # Copy lines to instruments.txt of an --audio-pack and change the voice:\n\
+         # [NN:]<patch> <program 0-127>  or  [NN:]<patch> drum <key>   (NN: only in song NN)\n\n",
+    );
+    let table = load_instrument_table(audio_pack);
+    for (n, song) in data.audio.songs.iter().enumerate() {
+        if song.commands.is_empty() {
+            continue;
+        }
+        std::fs::write(music.join(format!("{:02}.mid", n)), midi::song_to_midi(song, n, &table))?;
+        report.push_str(&midi::song_report(song, n, &table));
+    }
+    std::fs::write(dir.join("instruments.txt"), report)?;
+    println!("exported {} songs to {}", data.audio.songs.len(), music.display());
+    Ok(())
+}
+
+/// The instrument overrides of `--midi-music`: `instruments.txt` of the
+/// audio pack.
+pub fn load_instrument_table(audio_pack: Option<&std::path::Path>) -> crate::assets::midi::InstrumentTable {
+    audio_pack
+        .and_then(|d| std::fs::read_to_string(d.join("instruments.txt")).ok())
+        .map(|t| crate::assets::midi::parse_instrument_table(&t))
+        .unwrap_or_default()
 }

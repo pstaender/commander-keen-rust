@@ -8,7 +8,8 @@
 //!
 //! Every sound effect and song can be replaced by a modern file (wav, ogg,
 //! flac, mp3; songs may also be .mid when a SoundFont is given). See
-//! `AudioPack`.
+//! `AudioPack`. With `--midi-music` the songs are converted to General MIDI
+//! (`assets::midi`) and played through the SoundFont.
 
 use crate::assets::audio::{AdlibSound, Audio, PcSound, Song};
 use oplon::Opl2;
@@ -388,6 +389,71 @@ pub struct SoundManager {
     ext_priority: u16,
     current_song: Option<usize>,
     soundfont: Option<Arc<rustysynth::SoundFont>>,
+    /// --midi-music: instrument overrides, converted songs
+    midi_music: Option<crate::assets::midi::InstrumentTable>,
+    midi_cache: std::collections::HashMap<usize, Arc<rustysynth::MidiFile>>,
+}
+
+/// Volume of SoundFont music relative to the emulated AdLib.
+const MIDI_GAIN: f32 = 3.5;
+
+fn midi_source(sf: &Arc<rustysynth::SoundFont>, midi: &Arc<rustysynth::MidiFile>) -> Option<MidiSource> {
+    let settings = rustysynth::SynthesizerSettings::new(SAMPLE_RATE as i32);
+    let syn = rustysynth::Synthesizer::new(sf, &settings).ok()?;
+    let mut seq = rustysynth::MidiFileSequencer::new(syn);
+    seq.play(midi, true);
+    Some(MidiSource { seq, l: Vec::new(), r: Vec::new(), pos: 0, right: false })
+}
+
+fn load_soundfont(path: &Path) -> Option<Arc<rustysynth::SoundFont>> {
+    let mut f = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("soundfont {}: {}", path.display(), e);
+            return None;
+        }
+    };
+    match rustysynth::SoundFont::new(&mut f) {
+        Ok(s) => Some(Arc::new(s)),
+        Err(e) => {
+            eprintln!("soundfont {}: {:?}", path.display(), e);
+            None
+        }
+    }
+}
+
+/// A SoundFont for --midi-music when none is given: the first .sf2 in the
+/// data directory, next to the executable or in the current directory, or
+/// a system-wide General MIDI SoundFont.
+pub fn find_soundfont(data_dir: &Path) -> Option<PathBuf> {
+    let mut dirs = vec![data_dir.to_path_buf()];
+    if let Some(d) = std::env::current_exe().ok().and_then(|e| e.parent().map(|p| p.to_path_buf())) {
+        dirs.push(d);
+    }
+    dirs.push(PathBuf::from("."));
+    for d in dirs {
+        if let Ok(rd) = std::fs::read_dir(&d) {
+            let mut v: Vec<PathBuf> = rd
+                .flatten()
+                .map(|e| e.path())
+                .filter(|p| p.extension().map(|e| e.eq_ignore_ascii_case("sf2")).unwrap_or(false))
+                .collect();
+            v.sort();
+            if let Some(p) = v.into_iter().next() {
+                return Some(p);
+            }
+        }
+    }
+    [
+        "/usr/share/sounds/sf2/FluidR3_GM.sf2",
+        "/usr/share/soundfonts/FluidR3_GM.sf2",
+        "/usr/share/soundfonts/default.sf2",
+        "/usr/local/share/soundfonts/default.sf2",
+        "/opt/homebrew/share/soundfonts/default.sf2",
+    ]
+    .iter()
+    .map(PathBuf::from)
+    .find(|p| p.exists())
 }
 
 impl SoundManager {
@@ -408,6 +474,8 @@ impl SoundManager {
             ext_priority: 0,
             current_song: None,
             soundfont: None,
+            midi_music: None,
+            midi_cache: std::collections::HashMap::new(),
         };
         let synth = Arc::new(Mutex::new(Synth::new(audio)));
         if enable {
@@ -423,15 +491,33 @@ impl SoundManager {
             }
         }
         if let Some(sf) = &sm.pack.soundfont {
-            if let Ok(mut f) = std::fs::File::open(sf) {
-                match rustysynth::SoundFont::new(&mut f) {
-                    Ok(s) => sm.soundfont = Some(Arc::new(s)),
-                    Err(e) => eprintln!("soundfont {}: {:?}", sf.display(), e),
-                }
-            }
+            sm.soundfont = load_soundfont(sf);
         }
         sm.synth = Some(synth);
         sm
+    }
+
+    /// --midi-music: play the songs converted to General MIDI (`table`:
+    /// instrument overrides). Needs a SoundFont; returns false without one.
+    pub fn set_midi_music(&mut self, table: crate::assets::midi::InstrumentTable) -> bool {
+        if self.soundfont.is_none() {
+            return false;
+        }
+        self.midi_music = Some(table);
+        true
+    }
+
+    /// The converted song `n` (cached).
+    fn midi_song(&mut self, n: usize) -> Option<Arc<rustysynth::MidiFile>> {
+        let table = self.midi_music.as_ref()?;
+        if let Some(m) = self.midi_cache.get(&n) {
+            return Some(m.clone());
+        }
+        let song = self.songs.get(n).filter(|s| !s.commands.is_empty())?;
+        let bytes = crate::assets::midi::song_to_midi(song, n, table);
+        let m = Arc::new(rustysynth::MidiFile::new(&mut std::io::Cursor::new(bytes)).ok()?);
+        self.midi_cache.insert(n, m.clone());
+        Some(m)
     }
 
     fn with<R>(&self, f: impl FnOnce(&mut Synth) -> R) -> Option<R> {
@@ -533,18 +619,23 @@ impl SoundManager {
                     }
                 }
             }
-            if let (Some(p), Some(sf)) = (self.pack.find("music", n, &["mid"]), &self.soundfont) {
+        }
+        if let (Some(sf), true) = (self.soundfont.clone(), self.music_sink.is_some()) {
+            let mut midi = None;
+            if let Some(p) = self.pack.find("music", n, &["mid"]) {
                 if let Ok(mut f) = std::fs::File::open(&p) {
-                    if let Ok(midi) = rustysynth::MidiFile::new(&mut f) {
-                        let settings = rustysynth::SynthesizerSettings::new(SAMPLE_RATE as i32);
-                        if let Ok(syn) = rustysynth::Synthesizer::new(sf, &settings) {
-                            let mut seq = rustysynth::MidiFileSequencer::new(syn);
-                            seq.play(&Arc::new(midi), true);
-                            sink.append(MidiSource { seq, l: Vec::new(), r: Vec::new(), pos: 0, right: false });
-                            sink.play();
-                            return;
-                        }
-                    }
+                    midi = rustysynth::MidiFile::new(&mut f).ok().map(Arc::new);
+                }
+            }
+            if midi.is_none() {
+                midi = self.midi_song(n);
+            }
+            if let (Some(m), Some(sink)) = (midi, &self.music_sink) {
+                if let Some(src) = midi_source(&sf, &m) {
+                    sink.set_volume(MIDI_GAIN);
+                    sink.append(src);
+                    sink.play();
+                    return;
                 }
             }
         }
@@ -596,9 +687,28 @@ pub fn render_to_wav(audio: &Audio, song: Option<usize>, sfx: Option<(usize, SdM
     let total = (SAMPLE_RATE as f32 * seconds) as usize;
     let mut buf = vec![0f32; total];
     s.render(&mut buf);
+    write_wav(&buf, path)
+}
+
+/// Renders song `n` converted to MIDI through `soundfont` (mono mix) to a
+/// WAV file, like `render_to_wav` (comparing levels and instruments).
+pub fn render_midi_to_wav(audio: &Audio, n: usize, soundfont: &Path, table: &crate::assets::midi::InstrumentTable, seconds: f32, path: &Path) -> std::io::Result<()> {
+    let err = |m: &str| std::io::Error::other(m.to_string());
+    let sf = load_soundfont(soundfont).ok_or_else(|| err("no soundfont"))?;
+    let song = audio.songs.get(n).ok_or_else(|| err("no such song"))?;
+    let bytes = crate::assets::midi::song_to_midi(song, n, table);
+    let midi = Arc::new(rustysynth::MidiFile::new(&mut std::io::Cursor::new(bytes)).map_err(|e| err(&format!("{:?}", e)))?);
+    let mut src = midi_source(&sf, &midi).ok_or_else(|| err("synth"))?;
+    let total = (SAMPLE_RATE as f32 * seconds) as usize;
+    let buf: Vec<f32> = (0..total).map(|_| (src.next().unwrap_or(0.0) + src.next().unwrap_or(0.0)) * 0.5 * MIDI_GAIN).collect();
+    write_wav(&buf, path)
+}
+
+fn write_wav(buf: &[f32], path: &Path) -> std::io::Result<()> {
+    let total = buf.len();
     let mut data = Vec::with_capacity(total * 2);
-    for v in &buf {
-        data.extend_from_slice(&((v * 32767.0) as i16).to_le_bytes());
+    for v in buf {
+        data.extend_from_slice(&((v.clamp(-1.0, 1.0) * 32767.0) as i16).to_le_bytes());
     }
     let mut out = Vec::new();
     out.extend_from_slice(b"RIFF");

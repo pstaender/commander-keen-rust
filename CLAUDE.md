@@ -10,7 +10,10 @@ runtime and are never committed.
 ## Layout
 - `src/assets/` – original file formats: LZEXE unpacker (the EXEs are packed),
   Huffman, Carmack+RLEW, EGAGRAPH (EGA planar → indexed images), GAMEMAPS,
-  tile info (from MAPHEAD), AUDIO (PC speaker / AdLib / IMF). `episode.rs`
+  tile info (from MAPHEAD), AUDIO (PC speaker / AdLib / IMF), `midi.rs`
+  IMF → General MIDI (`--midi-music`, `--export-midi`; instruments are
+  classified by rendering each OPL patch once, overrides in the audio
+  pack's `instruments.txt`). `episode.rs`
   holds the per-episode layout (file names, chunk counts, header offsets in
   the executables); the episode is detected from the data directory.
   `exe.rs` locates the headers linked into the executable.
@@ -107,6 +110,9 @@ runtime and are never committed.
   to the original graphics.
 - `--audio-pack DIR`: `sfx/NN.ogg|wav|flac|mp3` replaces sound NN,
   `music/NN.ogg|...|mid` replaces song NN (`--soundfont FILE.sf2` for MIDI).
+- `--midi-music`: songs converted to General MIDI and played through the
+  SoundFont (`--soundfont` or the first `.sf2` found); `--export-midi DIR`
+  writes them as an editable audio pack.
 
 ## Work log
 Major steps and decisions are recorded in `claude_history.log`.

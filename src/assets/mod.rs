@@ -8,6 +8,7 @@ pub mod graphics;
 pub mod huffman;
 pub mod lzexe;
 pub mod maps;
+pub mod midi;
 
 pub use episode::{Episode, Layout};
 use std::path::{Path, PathBuf};

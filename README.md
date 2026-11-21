@@ -70,7 +70,9 @@ case-insensitively.
 | `--data DIR` | directory with the original game files (default `KEEN4`, `KEEN5` or `KEEN6`, after the executable's name) |
 | `--gfx-pack DIR` | high-resolution graphics replacement pack (see below) |
 | `--audio-pack DIR` | replacement sound effects and music (see below) |
-| `--soundfont FILE` | SoundFont (`.sf2`) used for `.mid` replacement music |
+| `--soundfont FILE` | SoundFont (`.sf2`) for `--midi-music` and `.mid` replacement music |
+| `--midi-music` | play the music as General MIDI converted from the original AdLib songs (see below) |
+| `--export-midi DIR` | write all songs as `DIR/music/NN.mid` plus `DIR/instruments.txt` and exit |
 | `--window-scale N` | window size multiplier (default 3) |
 | `--fullscreen` / `--windowed` | start fullscreen or in a window (otherwise the last used mode from `config.txt`) |
 | `--no-aspect` | don't stretch 320×200 to 4:3 |
@@ -254,6 +256,37 @@ Missing files fall back to the original graphics. The game logic still runs at
 
 Anything not replaced plays through the emulated AdLib/PC speaker.
 
+### MIDI music: `--midi-music`
+
+The original songs are AdLib register streams. `--midi-music` converts them
+to General MIDI when the game loads and plays them through a SoundFont. Timing
+and loop points match the original exactly.
+
+- **SoundFont.** Pass it with `--soundfont FILE.sf2`. Without that option the
+  first `.sf2` in the data directory, next to the executable or in the
+  current directory is used, then a system one (e.g.
+  `/usr/share/sounds/sf2/FluidR3_GM.sf2`). The free
+  [GeneralUser GS](https://github.com/mrbumpy409/GeneralUser-GS) works well.
+  Without a SoundFont the game plays the AdLib music.
+- **Instruments.** Each AdLib instrument is played once on the emulated OPL2
+  and measured: attack, decay, sustain, tone or noise, brightness. That,
+  together with the keys it is played in, picks a General MIDI instrument or
+  drum. The instruments are guessed, so some will sound wrong. Override them
+  in `instruments.txt` of the `--audio-pack` directory, one per line:
+
+  ```
+  # [NN:]<patch> <program 0-127>   or   [NN:]<patch> drum <key>
+  03:090eda25000100f115000a 29          # song 03 only: overdriven guitar
+  000ba84c000000d64f0000 drum 36        # this instrument in every song: bass drum
+  ```
+
+  `--export-midi DIR` writes the `instruments.txt` of all songs in this
+  format. For each instrument it lists the chosen voice and what was
+  measured. Copy the lines you want to change.
+- **Editing songs.** The exported `.mid` files can be edited in any
+  sequencer. Use DIR as `--audio-pack` with a SoundFont, and the edited
+  `music/NN.mid` files are played instead of the converted ones.
+
 ## Development and testing aids
 
 Environment variables (mostly for use with `--headless`):
@@ -266,7 +299,7 @@ Environment variables (mostly for use with `--headless`):
 | `KEEN_KEYS="frame:scancode[+frames],..."` | scripted key presses |
 | `KEEN_PAD_DEBUG=1` | print the detected gamepads (name, mapping) and all their events |
 | `KEEN_TRACE=file` | log the player's map/x/y/sprite per game frame |
-| `KEEN_RENDER_WAV="song:N:file.wav"` | render music (or `pc:N:…`, `adlib:N:…` for sounds) to WAV and exit |
+| `KEEN_RENDER_WAV="song:N:file.wav"` | render music (or `midi:N:…` for the `--midi-music` version, `pc:N:…`, `adlib:N:…` for sounds) to WAV and exit |
 
 `tools/dosbox_trace.py` (`EP=4|5|6`) and `tools/compare_trace.py` record the
 same trace from the original game running in DOSBox Staging
