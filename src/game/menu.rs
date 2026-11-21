@@ -846,10 +846,17 @@ impl Game {
     fn usl_draw_ctl_panel(&mut self) {
         let top = self.cp_top();
         if self.cp_nitems(top) != 0 || self.menu.cards[top].title != 0 {
-            self.draw_pic(0, 0, CP_MENUSCREENPIC);
+            self.draw_menu_screen();
             self.usl_draw_ctl_panel_contents();
         }
         self.sys.present();
+    }
+
+    /// The control panel background (CP_MENUSCREENPIC); in a wide view the
+    /// arm is continued to the edges by repeating its outer columns.
+    fn draw_menu_screen(&mut self) {
+        self.draw_pic(0, 0, CP_MENUSCREENPIC);
+        self.sys.surface.extend_edges(8);
     }
 
     /// USL_DialogSetup (0x297ed): the box for a dialog, returns its corner.
@@ -1577,7 +1584,7 @@ impl Game {
         if call != UIC_SETUPCARD {
             return false;
         }
-        self.draw_pic(0, 0, CP_MENUSCREENPIC);
+        self.draw_menu_screen();
         self.draw_pic(0x82, 0x30, CP_PADDLEWARPIC);
         self.cp_hlin(0x4d, 0xe7, 0x3c, 10);
         self.cp_hlin(0x4d, 0xe7, 0x8f, 10);
@@ -1869,6 +1876,8 @@ impl Game {
         // can be opened again; clear it so a new request is detected
         self.restartgame = false;
         self.menu.ingame = ingame;
+        // widescreen: the panel fills the window (restored below)
+        self.set_screen_width(true);
         self.usl_set_up_ctl_panel();
         self.usl_draw_ctl_panel();
         let mut flash = true;
@@ -1896,6 +1905,10 @@ impl Game {
                 self.cp_item_mut(top, cur).flags |= UI_SELECTED;
             }
             self.cp_wait();
+            // follow window resizes / fullscreen toggles
+            if self.set_screen_width(true) {
+                self.usl_draw_ctl_panel();
+            }
             let ls = self.sys.input.last_scan;
             if ls != 0 {
                 match ls {
@@ -1941,6 +1954,13 @@ impl Game {
             // the mouse part of the original loop is not supported
         }
         self.usl_tear_down_ctl_panel();
+        // back to the view of the caller (the game loop's play field or
+        // the original 320 outside of it)
+        if self.wide_ok {
+            self.update_view();
+        } else {
+            self.set_screen_width(false);
+        }
     }
 
     // ---- US_LineInput (ID_US_1) -----------------------------------------------

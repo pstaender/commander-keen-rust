@@ -102,6 +102,28 @@ impl Surface {
         self.reset_clip();
     }
 
+    /// Widescreen: fills the areas left and right of the centered 320
+    /// wide screen by repeating its outermost `strip` logical columns
+    /// periodically (so dither patterns continue seamlessly).
+    pub fn extend_edges(&mut self, strip: usize) {
+        let s = self.scale;
+        let (x0, x1) = (self.xoff.max(0) as usize * s, (self.xoff.max(0) as usize + SCREEN_W) * s);
+        let p = strip * s;
+        if x0 == 0 || x1 > self.w || p == 0 || p > x1 - x0 {
+            return;
+        }
+        for row in self.px.chunks_exact_mut(self.w) {
+            // left: column x (< x0) repeats x0 + (x - x0) mod p
+            for x in 0..x0 {
+                row[x] = row[x0 + (x + p - x0 % p) % p];
+            }
+            // right: column x (>= x1) repeats x1 - p + (x - x1) mod p
+            for x in x1..self.w {
+                row[x] = row[x1 - p + (x - x1) % p];
+            }
+        }
+    }
+
     /// Restricts drawing to a logical rectangle.
     pub fn set_clip(&mut self, x: i32, y: i32, w: i32, h: i32) {
         let s = self.scale as i32;

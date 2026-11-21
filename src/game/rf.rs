@@ -324,6 +324,20 @@ impl Game {
         }
     }
 
+    /// Widescreen for the 320 wide screens outside the game loop that can
+    /// fill a wider window (the ID intro, the control panel): `wide` uses
+    /// the window's shape (320 with --classic-view), otherwise the original
+    /// 320. The surface is cleared when its width changes; returns whether
+    /// it did.
+    pub fn set_screen_width(&mut self, wide: bool) -> bool {
+        let want = if wide && !self.opts.classic_view { self.sys.wide_width() } else { 320 };
+        if self.sys.surface.logical_w() == want {
+            return false;
+        }
+        self.sys.surface.set_width(want);
+        true
+    }
+
     /// First map column of the view (the camera can be left of the map
     /// only in a wide view).
     fn view_x0(&self) -> i32 {

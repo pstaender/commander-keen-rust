@@ -73,7 +73,10 @@ runtime and are never committed.
   (`Camera::view`, `Game::update_view`); logical drawing is offset by
   `Surface::xoff` so 320-wide screens/windows stay centered, while the play
   field and score box draw at xoff 0. The original 320 code paths stay
-  unchanged so the demos keep in sync.
+  unchanged so the demos keep in sync. Outside the game loop only the ID
+  intro (Terminator, `ega_render_wide` paints beyond the 320 EGA view) and
+  the control panel (`Surface::extend_edges` continues the arm) go wide
+  (`Game::set_screen_width`); title, story etc. stay 320.
 - Original globals live in `Game` (src/game/mod.rs); module-private globals
   go in the module's `ModState`.
 - Don't commit game data or anything derived from the executable's code.

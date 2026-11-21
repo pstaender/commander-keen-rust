@@ -13,7 +13,7 @@ use crate::assets::graphics::Image;
 use crate::engine::input::{ControlInfo, Direction};
 use crate::engine::input::SC_F1;
 use crate::engine::input::SC_SPACE;
-use crate::engine::video::EGA_RGB;
+use crate::engine::video::{EGA_RGB, SCREEN_W};
 
 /// One entry of the high score table (HighScore, 0x40 bytes at DS:0x3d88).
 #[derive(Clone, Debug, Default)]
@@ -157,23 +157,45 @@ impl Game {
     /// Shows the EGA memory starting at CRTC address `start` with pel
     /// panning `pel` on the surface (in logical 320x200 pixels).
     fn ega_render(&mut self, ega: &Ega, start: u16, pel: u16) {
+        self.ega_render_wide(ega, start, pel, None);
+    }
+
+    /// `ega_render` for a view wider than 320 (the intro): `outside(y, row,
+    /// xoff)` paints the colours of line `y` beyond the original screen into
+    /// `row` (index = x + xoff, all pixels cleared to 0); the
+    /// original 320 pixels in the middle always come from the EGA memory.
+    /// The surface follows the window's shape.
+    fn ega_render_wide(&mut self, ega: &Ega, start: u16, pel: u16, outside: Option<&dyn Fn(i32, &mut [u8], i32)>) {
+        if outside.is_some() {
+            self.set_screen_width(true);
+        }
         let s = &mut self.sys.surface;
         let sc = s.scale;
+        let lw = s.logical_w();
+        let xoff = s.xoff.max(0) as usize;
         let colors: [u32; 16] = std::array::from_fn(|i| 0xff00_0000 | EGA_RGB[i]);
+        let mut row = vec![0u8; lw];
         for y in 0..200usize {
-            let row = start.wrapping_add((y as u16).wrapping_mul(ega.lw));
-            for x in 0..320usize {
+            row.fill(0);
+            if let Some(f) = outside {
+                if lw > SCREEN_W {
+                    f(y as i32, &mut row, xoff as i32);
+                }
+            }
+            let line = start.wrapping_add((y as u16).wrapping_mul(ega.lw));
+            for x in 0..SCREEN_W.min(lw) {
                 let px = x + pel as usize;
-                let a = row.wrapping_add((px >> 3) as u16) as usize;
+                let a = line.wrapping_add((px >> 3) as u16) as usize;
                 let bit = 7 - (px & 7);
-                let c = ((ega.planes[0][a] >> bit) & 1)
+                row[x + xoff] = ((ega.planes[0][a] >> bit) & 1)
                     | (((ega.planes[1][a] >> bit) & 1) << 1)
                     | (((ega.planes[2][a] >> bit) & 1) << 2)
                     | (((ega.planes[3][a] >> bit) & 1) << 3);
-                let col = colors[c as usize];
-                for yy in y * sc..(y + 1) * sc {
-                    let r = yy * s.w;
-                    s.px[r + x * sc..r + (x + 1) * sc].fill(col);
+            }
+            for yy in y * sc..(y + 1) * sc {
+                let r = &mut s.px[yy * s.w..(yy + 1) * s.w];
+                for (x, &c) in row.iter().enumerate() {
+                    r[x * sc..(x + 1) * sc].fill(colors[c as usize & 15]);
                 }
             }
         }
@@ -183,6 +205,12 @@ impl Game {
     /// vertical retrace.
     fn ega_set_screen(&mut self, ega: &Ega, start: u16, pel: u16) {
         self.ega_render(ega, start, pel);
+        self.sys.wait_vbl(1);
+    }
+
+    /// `ega_set_screen` with a wide view (see `ega_render_wide`).
+    fn ega_set_screen_wide(&mut self, ega: &Ega, start: u16, pel: u16, outside: &dyn Fn(i32, &mut [u8], i32)) {
+        self.ega_render_wide(ega, start, pel, Some(outside));
         self.sys.wait_vbl(1);
     }
 
@@ -567,7 +595,7 @@ impl Game {
         // KEEN goes into plane 0, 200 pixels into the virtual screen
         ega.mask = 1;
         let a341 = keen.width.wrapping_add(200);
-        self.ega_set_screen(&ega, (a341 >> 3) + 1, 0);
+        self.ega_set_screen_wide(&ega, (a341 >> 3) + 1, 0, &|_, _, _| {});
         for y in 0..200 {
             let mut a = ega.ylookup(y).wrapping_add(0x19);
             for b in rle_line(&keen.lines[y as usize]) {
@@ -643,6 +671,7 @@ impl Game {
             fizzled = true;
         }
         // VW_ClearVideo(0), VW_SetLineWidth(64), VW_SetDefaultColors
+        self.set_screen_width(false);
         self.sys.surface.clear(0);
         self.set_default_colors();
         if super::EPISODE == 6 {
@@ -710,6 +739,8 @@ impl Game {
             pos = (dist - time) * a341 / dist;
             t.draw_credit(time as i16, pos as u16);
             let mut x = startx + delta * time / dist;
+            // screen x of COMMANDER (the wide view draws it directly)
+            let cx = x;
             x += pos & 7;
             let col = (x + 0x800) / 8 - 0x100;
             let shift = ((x + 0x800) & 7) as usize;
@@ -766,7 +797,10 @@ impl Game {
                 di = di.wrapping_add(dstskip);
             }
             let start = t.pageofs.wrapping_add((pos / 8) as u16);
-            self.ega_set_screen(&t.ega, start, (pos & 7) as u16);
+            {
+                let paint = Self::scroll_outside(t, pos, cx);
+                self.ega_set_screen_wide(&t.ega, start, (pos & 7) as u16, &paint);
+            }
             t.flip();
             let tics = self.wait_tics(2);
             self.tics = tics;
@@ -776,6 +810,39 @@ impl Game {
             time += tics;
         }
         t.screenofs = (pos / 8) as u16;
+    }
+
+    /// Widescreen: what lies beside the original screen during the scroll.
+    /// KEEN (plane 0) is read from the page in the EGA memory at virtual x
+    /// `pos` + screen x; COMMANDER (plane 1, drawn only into the visible
+    /// part by the original) comes from its unshifted half height lines at
+    /// screen x `cx`; the credits (planes 2, 3) stay in the middle.
+    fn scroll_outside(t: &Term, pos: i32, cx: i32) -> impl Fn(i32, &mut [u8], i32) + '_ {
+        let pageofs = t.pageofs;
+        let sw = t.shiftwidth as usize;
+        let cw = t.commander.width as i16 as i32;
+        move |y, row, xoff| {
+            let line = pageofs.wrapping_add(t.ega.ylookup(y));
+            let crow = t.shifted[0].get((y as usize / 2) * sw..).unwrap_or(&[]);
+            for (i, c) in row.iter_mut().enumerate() {
+                let sx = i as i32 - xoff;
+                if (0..SCREEN_W as i32).contains(&sx) {
+                    continue;
+                }
+                let mut v = 0;
+                let vx = pos + sx;
+                if (0..0x7c * 8).contains(&vx) {
+                    let a = line.wrapping_add((vx >> 3) as u16) as usize;
+                    v |= (t.ega.planes[0][a] >> (7 - (vx & 7))) & 1;
+                }
+                let px = sx - cx;
+                if (0..cw).contains(&px) {
+                    let b = crow.get((px >> 3) as usize).copied().unwrap_or(0);
+                    v |= ((b >> (7 - (px & 7))) & 1) << 1;
+                }
+                *c = v;
+            }
+        }
     }
 
     /// Scales one line of the combined logo (0x1440f).
@@ -964,7 +1031,29 @@ impl Game {
                 t.ega.bar(bufofs, 0, bottom, 0x140, oldbottom[t.page] - bottom, 0);
                 oldbottom[t.page] = bottom;
             }
-            self.ega_set_screen(&t.ega, bufofs, 0);
+            // widescreen: the parts of the logo the original clips at the
+            // screen edges (the set runs of each scaled line, colour 15)
+            let paint = |y: i32, row: &mut [u8], xoff: i32| {
+                let r = y - top as i32;
+                if r < 0 || r >= height as i32 {
+                    return;
+                }
+                let Some(line) = lines.get(((r as u16).wrapping_mul(ystep) >> 8) as usize) else {
+                    return;
+                };
+                let tv = |v: u16| table.get(v as usize).copied().unwrap_or(0x7fff) as i16 as i32;
+                let mut k = 1;
+                while k + 1 < line.len() && line[k] != 0xffff && line[k + 1] != 0xffff {
+                    let (a, b) = (tv(line[k]) + x, tv(line[k + 1]) + x);
+                    for sx in a.max(-xoff)..b.min(row.len() as i32 - xoff) {
+                        if !(0..SCREEN_W as i32).contains(&sx) {
+                            row[(sx + xoff) as usize] = 15;
+                        }
+                    }
+                    k += 2;
+                }
+            };
+            self.ega_set_screen_wide(&t.ega, bufofs, 0, &paint);
             t.flip();
             let now = self.sys.time_count();
             let mut tics = now - self.lasttimecount;
@@ -1001,7 +1090,7 @@ impl Game {
         } else {
             (t.screenofs, t.screenofs.wrapping_add(0x7c))
         };
-        self.ega_set_screen(&t.ega, dispofs, 0);
+        self.ega_set_screen_wide(&t.ega, dispofs, 0, &|_, _, _| {});
         let pic = &self.data.gfx.pics[TITLEPICPIC as usize - super::consts::STARTPICS];
         t.ega.draw_pic(drawofs, 0, 0, pic);
         let diff = dispofs.wrapping_sub(drawofs);
@@ -1026,7 +1115,7 @@ impl Game {
                 }
             }
             // VW_WaitVBL(1)
-            self.ega_render(&t.ega, dispofs, 0);
+            self.ega_render_wide(&t.ega, dispofs, 0, Some(&|_, _, _| {}));
             self.sys.wait_vbl(1);
             if self.intro_aborted() {
                 return;
