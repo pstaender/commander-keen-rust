@@ -392,7 +392,8 @@ impl Sys {
     /// buttons are held states, MENU sets Esc, jump Space (for "press a
     /// key"), the state actions `pad_save` / `pad_load`. While the control
     /// panel is open the pad navigates it, while binding an action the next
-    /// input goes to `pad_captured`.
+    /// input goes to `pad_captured`. In the control panel fire answers Y
+    /// (yes) in the Y/N questions.
     ///
     /// Pads gilrs has no mapping for (e.g. many SNES style USB pads) report
     /// raw codes: their X/Y axes and hat switch move as well, and in the
@@ -520,6 +521,8 @@ impl Sys {
                 (PAD_LEFT, SC_LEFTARROW),
                 (PAD_RIGHT, SC_RIGHTARROW),
                 (PAD_JUMP, SC_RETURN),
+                // "yes" in the Y/N questions (quit, end game, resume)
+                (PAD_FIRE, SC_Y),
                 (PAD_POGO, SC_ESCAPE),
                 (PAD_MENU, SC_ESCAPE),
             ] {

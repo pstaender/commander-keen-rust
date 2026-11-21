@@ -119,7 +119,8 @@ stick; Esc cancels; Space, Backspace or the button already bound there
 clears it; a button used by another action is swapped with it). The left stick always moves too. Pads without a known mapping work as
 well: their d-pad/stick moves, and any button can be bound in the menu.
 In the control panel the gamepad navigates: d-pad/stick, A = select,
-B/Start/Select = back.
+B/Start/Select = back, X (fire) = Y (yes) in the
+Y/N questions.
 
 ### Debug keys (`--debug-shortcuts`)
 
