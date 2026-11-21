@@ -1307,8 +1307,9 @@ impl Game {
     }
 
     /// Waits for the gamepad input of `action` (like USL_CKSetKey): Esc
-    /// cancels, Backspace / Delete clear the binding. An input bound to
-    /// another action of the same kind is refused.
+    /// cancels, Space / Backspace / Delete or the input already bound to
+    /// this action clear the binding. An input bound to another action is
+    /// swapped: that action gets the old binding of this one.
     fn usl_pad_set_button(&mut self, i: usize, action: usize) {
         let mut on = false;
         let mut lasttime = 0;
@@ -1330,18 +1331,24 @@ impl Game {
             }
             match self.sys.input.last_scan {
                 SC_ESCAPE => break None,
-                SC_BACKSPACE | SC_DELETE => break Some(PadInput::None),
+                SC_SPACE | SC_BACKSPACE | SC_DELETE => break Some(PadInput::None),
                 _ => self.sys.input.last_scan = 0,
             }
             self.cp_wait();
         };
         self.sys.input.pad_capture = false;
         if let Some(p) = got {
-            let map = &self.sys.input.pad_map;
-            if p != PadInput::None && (0..PAD_ACTIONS).any(|k| k != action && map[k] == p) {
-                self.usl_ctl_dialog("Button already used", "Press any key", None);
+            let map = &mut self.sys.input.pad_map;
+            let old = map[action];
+            if p == old {
+                map[action] = PadInput::None;
             } else {
-                self.sys.input.pad_map[action] = p;
+                if p != PadInput::None {
+                    if let Some(k) = (0..PAD_ACTIONS).find(|&k| k != action && map[k] == p) {
+                        map[k] = old;
+                    }
+                }
+                map[action] = p;
             }
         }
         self.sys.input.clear_keys_down();

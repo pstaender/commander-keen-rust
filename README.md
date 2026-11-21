@@ -115,7 +115,8 @@ B = pogo, X = fire, Start = control panel, LB = save state, RB = load
 the last saved state (`saves/STATE.CKn`, separate from the six saved
 games). With a gamepad connected, CONFIGURE → USE GAMEPAD lets you
 rebind movement and buttons (Enter, then press the button or move the
-stick; Esc cancels, Backspace clears). The left stick always moves too. Pads without a known mapping work as
+stick; Esc cancels; Space, Backspace or the button already bound there
+clears it; a button used by another action is swapped with it). The left stick always moves too. Pads without a known mapping work as
 well: their d-pad/stick moves, and any button can be bound in the menu.
 In the control panel the gamepad navigates: d-pad/stick, A = select,
 B/Start/Select = back.
