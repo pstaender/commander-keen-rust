@@ -75,7 +75,7 @@ case-insensitively.
 | `--fullscreen` / `--windowed` | start fullscreen or in a window (otherwise the last used mode from `config.txt`) |
 | `--no-aspect` | don't stretch 320×200 to 4:3 |
 | `--classic-view` | keep the original 320×200 play field instead of widening it to the screen |
-| `--no-auto-save` | turn off the autosave (every 10 s to `saves/AUTOSAVE.CKn`; after a crash, kill or quit the game offers to resume it at the next start) |
+| `--no-auto-save` | turn off the autosave (every 5 s to `saves/AUTOSAVE.CKn`; after a crash, kill or quit the game offers to resume it at the next start) |
 | `--system-shortcuts` | macOS: keep the system keyboard shortcuts active while the game has focus (see below) |
 | `--nosound` | disable audio output |
 | `--level N` | start directly in map N (0 = world map) |
@@ -110,60 +110,60 @@ while jumping. The game turns the system shortcuts off while its window has
 focus. They come back when you switch to another app, and while Cmd is held,
 so Cmd+Tab and Cmd+Space keep working. `--system-shortcuts` disables this.
 
-Gamepads work without calibration: stick or d-pad to move, A = jump,
-B = pogo, X = fire, Start = control panel, LB = save state, RB = load
-the last saved state (`saves/STATE.CKn`, separate from the six saved
-games). With a gamepad connected, CONFIGURE → USE GAMEPAD lets you
-rebind movement and buttons (Enter, then press the button or move the
-stick; Esc cancels; Space, Backspace or the button already bound there
-clears it; a button used by another action is swapped with it). The left stick always moves too. Pads without a known mapping work as
-well: their d-pad/stick moves, and any button can be bound in the menu.
-In the control panel the gamepad navigates: d-pad/stick, A = select,
-B/Start/Select = back, X (fire) = Y (yes) in the
-Y/N questions.
+### Gamepad
 
-### Debug keys (`--debug-shortcuts`)
+Gamepads (USB or Bluetooth) work without calibration. Default layout
+(Xbox style names; on a SNES style pad A/B/X/Y are the buttons at those
+positions):
 
-With `--debug-shortcuts` (or `--debug`) the original's debug keys are
-available: hold **F10** and press a key. In KEEN6C.EXE v1.4 these keys are
-always active; the port enables them only on request. In Keen 4 and 5 they
-can also be switched on like in the original: hold **A** and **2** while
-opening the status window with Enter ("Debug keys active"). Keen 4 and 5
-also have the **B+A+T** cheat (all keys, 99 shots, an extra Keen; Keen 5
-also the keycard), F10+I gives the wetsuit (Keen 4) or the keycard (Keen 5).
+| Button | In the game | In the menus |
+|---|---|---|
+| D-pad (the left stick always works too) | move | move the cursor |
+| A | jump | select (Enter) |
+| B | pogo | back (Esc) |
+| X | fire | Y (yes) in the Y/N questions |
+| Start | open the control panel | back |
+| Select | – | back |
+| LB | quick save | – |
+| RB | load the quick save | – |
 
-| Key | Function |
-|---|---|
-| F10+G | god mode |
-| F10+I | free items (keys, 99 ammo, sandwich, rope, passcard, 3000 points) |
-| F10+J | jump cheat (you can't jump down while it's on) |
-| F10+N | no clipping (falling off the bottom of a level still kills you) |
-| F10+Y | reveal walls: marks every wall side on the tiles, so fake walls and hidden passages show up (see note) |
-| F10+B | border color (0–15) |
-| F10+C | number of active/inactive objects |
-| F10+D | record a demo: asks for a level, plays it in demo mode, F10+D again stops and saves `DEMOn.CKn` in the data directory (play it with `--demo DEMOn.CKn`) |
-| F10+E | end (complete) the current level |
-| F10+M | memory usage (the port shows the size of the loaded data) |
-| F10+P | save a screenshot to `screenshots/` in the data directory (the original froze the screen and exited to DOS for a screen grab) |
-| F10+S | slow motion |
-| F10+T | sprite test: Up/Down/PgUp/PgDn select a sprite, Left/Right the shift, Esc leaves |
-| F10+V | add 0–8 extra VBLs per frame |
-| F10+W | warp to a level (1–18) |
-| F10+Z | kill Keen and lose all lives |
+**Configure:** with a gamepad connected, CONFIGURE in the control panel
+shows USE GAMEPAD (instead of the joystick entries) with
 
-Note on F10+Y: the original draws the wall icons from masked tiles
-0x6c–0x7b, which Keen 4 contains but Keen 6 ships empty (the original game
-would draw garbage). The port draws colored bars instead: north yellow, south
-red, east green, west cyan, slopes magenta. They stay until the game exits.
+- CONFIGURE MOVEMENT: up, down, left, right
+- CONFIGURE BUTTONS: jump, pogo, fire, menu, save state, load state
+- DEFAULT LAYOUT: back to the table above
 
-Holding **E+N+D** together during play ends the game with the finale, in
-the original too (Keen 4: as if the last council member was rescued; Keen 5:
-the QED is destroyed). This doesn't need `--debug-shortcuts`.
+Select an entry and press the button (or push the stick / d-pad) for it.
+Esc cancels. Space, Backspace or pressing the button that is already bound
+there clears the entry. A button that another action uses is swapped: the
+other action gets the old button of this one. The layout is stored in
+`config.txt`.
+
+Pads the gamepad library doesn't know (many cheap SNES style pads) work as
+well: their d-pad/stick moves, in the menus the four face buttons select
+and the others go back, and every button can be bound as above. If a pad
+does not react, `KEEN_PAD_DEBUG=1` prints what it sends.
 
 ### Saves and settings
 
-- Saved games go to `saves/SAVEGAMn.CKn` inside the data directory. This port uses its own format, so
-  saves from the DOS version can't be loaded.
+- **Saved games:** LOAD GAME / SAVE GAME in the control panel, six slots in
+  `saves/SAVEGAMn.CKn` inside the data directory. This port uses its own
+  format, so saves from the DOS version can't be loaded.
+- **Quick save:** the gamepad's save state button (LB) saves to
+  `saves/STATE.CKn` without asking, load state (RB) goes back to it. It is
+  separate from the six slots.
+- **Autosave:** while you play, the game is saved every 5 seconds to
+  `saves/AUTOSAVE.CKn`, and once more when you quit in the middle of a game
+  (not while Keen is dying, so it always holds a moment before). After a
+  crash, kill or quit, the next start asks "Resume your last game?" (Y /
+  N, on a gamepad A / B). The autosave is removed when the game ends (game
+  over, won, END GAME) or a new game starts. `--no-auto-save` turns it off.
+- **Load menu:** the second page of LOAD GAME has the quick save and the
+  autosave. Go down past the last slot or up past the first one (or press
+  left/right) to turn the page.
+- With `--cheatmode`, F2 saves to and F3 loads the slot last saved or
+  loaded, without asking.
 - Settings (sound mode, key bindings, gamepad, fullscreen) and high scores are stored in
   `config.txt` in the data directory, so each episode has its own.
 
@@ -175,9 +175,12 @@ at the original 200 lines, and the width grows from 320 up to 864 pixels
 left and right. Resizing the window or toggling fullscreen updates the view
 immediately.
 
-- The status window, menus and dialogs stay 320×200 and are centered. The
-  score box stays in the top left corner. The title, intro, story and the
-  other full-screen pictures are shown 4:3 with borders.
+- The status window and dialogs stay 320×200 and are centered. The score
+  box stays in the top left corner.
+- The ID Software intro (COMMANDER KEEN flying in and zooming out) and the
+  control panel fill the whole width; the arm around the menu computer is
+  continued to the edges. The title, story and the other full-screen
+  pictures are shown 4:3 with borders.
 - Keen stays in the middle of the screen. Enemies wake up when they come into
   the wider view, so the game plays slightly differently than in the
   original.
