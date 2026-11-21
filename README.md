@@ -254,6 +254,9 @@ Missing files fall back to the original graphics. The game logic still runs at
 - `DIR/sfx/NN.ogg` (or `.wav`, `.flac`, `.mp3`) replaces sound effect NN
 - `DIR/music/NN.ogg` (or `.wav`, `.flac`, `.mp3`, `.mid`) replaces song NN
 - `.mid` files need `--soundfont FILE.sf2`
+- files in `DIR/sfx/k4/`, `k5/`, `k6/` (and `music/kN/`) are used only by
+  that episode and win over `DIR/sfx/`: the sound numbers mean different
+  sounds in each episode
 
 Anything not replaced plays through the emulated AdLib/PC speaker.
 

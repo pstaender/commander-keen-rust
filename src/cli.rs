@@ -169,6 +169,11 @@ pub fn main(default_dir: &str) {
         soundfont = crate::engine::sound::find_soundfont(&data_dir);
     }
     let mut sd = SoundManager::new(&data.audio, sound && !headless, audio_pack.as_deref(), soundfont.as_deref());
+    sd.set_episode(match data.episode {
+        Episode::K4 => 4,
+        Episode::K5 => 5,
+        Episode::K6 => 6,
+    });
     if midi_music && !sd.set_midi_music(load_instrument_table(audio_pack.as_deref())) {
         eprintln!("--midi-music: no SoundFont found (give one with --soundfont FILE.sf2, or put it into the data directory); playing AdLib music");
     }

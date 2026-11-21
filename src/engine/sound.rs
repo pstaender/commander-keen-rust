@@ -311,20 +311,31 @@ impl Source for SynthSource {
 }
 
 /// Replacement audio files. Layout of the pack directory:
-/// `sfx/NN.ext` for sound effect NN (0..59) and `music/NN.ext` for song NN.
+/// `sfx/NN.ext` for sound effect NN and `music/NN.ext` for song NN; files
+/// in `sfx/kN/` and `music/kN/` (N = 4, 5, 6) are only used by that episode
+/// and come first (the numbers mean different sounds per episode).
 pub struct AudioPack {
     pub dir: Option<PathBuf>,
     pub soundfont: Option<PathBuf>,
+    /// "k4", "k5" or "k6"
+    pub episode: Option<String>,
 }
 
 impl AudioPack {
     fn find(&self, sub: &str, n: usize, exts: &[&str]) -> Option<PathBuf> {
-        let d = self.dir.as_ref()?.join(sub);
-        for e in exts {
-            for name in [format!("{:02}.{}", n, e), format!("{}.{}", n, e)] {
-                let p = d.join(name);
-                if p.exists() {
-                    return Some(p);
+        let base = self.dir.as_ref()?.join(sub);
+        let mut dirs = Vec::new();
+        if let Some(ep) = &self.episode {
+            dirs.push(base.join(ep));
+        }
+        dirs.push(base);
+        for d in dirs {
+            for e in exts {
+                for name in [format!("{:02}.{}", n, e), format!("{}.{}", n, e)] {
+                    let p = d.join(name);
+                    if p.exists() {
+                        return Some(p);
+                    }
                 }
             }
         }
@@ -458,7 +469,7 @@ pub fn find_soundfont(data_dir: &Path) -> Option<PathBuf> {
 
 impl SoundManager {
     pub fn new(audio: &Audio, enable: bool, pack_dir: Option<&Path>, soundfont: Option<&Path>) -> SoundManager {
-        let pack = AudioPack { dir: pack_dir.map(|p| p.to_path_buf()), soundfont: soundfont.map(|p| p.to_path_buf()) };
+        let pack = AudioPack { dir: pack_dir.map(|p| p.to_path_buf()), soundfont: soundfont.map(|p| p.to_path_buf()), episode: None };
         let mut sm = SoundManager {
             synth: None,
             _stream: None,
@@ -495,6 +506,11 @@ impl SoundManager {
         }
         sm.synth = Some(synth);
         sm
+    }
+
+    /// Selects the episode subfolders (`sfx/k4/` …) of the audio pack.
+    pub fn set_episode(&mut self, episode: u8) {
+        self.pack.episode = Some(format!("k{}", episode));
     }
 
     /// --midi-music: play the songs converted to General MIDI (`table`:

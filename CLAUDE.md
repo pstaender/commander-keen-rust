@@ -113,7 +113,8 @@ runtime and are never committed.
   the integer factor in `DIR/pack.txt` (`scale=N`); missing files fall back
   to the original graphics.
 - `--audio-pack DIR`: `sfx/NN.ogg|wav|flac|mp3` replaces sound NN,
-  `music/NN.ogg|...|mid` replaces song NN (`--soundfont FILE.sf2` for MIDI).
+  `music/NN.ogg|...|mid` replaces song NN (`--soundfont FILE.sf2` for MIDI);
+  `sfx/kN/`, `music/kN/` (N = 4, 5, 6) are per episode and come first.
 - `--midi-music`: songs converted to General MIDI and played through the
   SoundFont (`--soundfont` or the first `.sf2` found); `--export-midi DIR`
   writes them as an editable audio pack.
