@@ -22,7 +22,9 @@ runtime and are never committed.
   OPL2 via `oplon`, PC speaker) with replacement audio (rodio, rustysynth),
   `input.rs` scan codes / ControlInfo, gamepad bindings (`PadInput`,
   `pad_map`; read in `Sys::sync_pad`, set up in the menu's PADCARD).
-  Headless: `KEEN_PAD=1` pretends a gamepad is connected.
+  Headless: `KEEN_PAD=1` pretends a gamepad is connected;
+  `KEEN_PAD_DEBUG=1` prints the pads and their events. gilrs runs without
+  its default filters (they drop d-pad axes that don't reach exactly ±1).
 - `src/game/` – the shared CK_* modules, ported function by function from
   the decompilation. Like the original source (one set of files with
   `#ifdef`s) they are compiled once per episode module (`src/ckN/mod.rs`

@@ -164,8 +164,10 @@ pub struct Sys {
     pad: Option<gilrs::Gilrs>,
     /// gamepad actions held in the last poll (for presses)
     pad_prev: [bool; super::input::PAD_ACTIONS],
-    /// last value of each binding axis (to detect an axis being moved)
-    pad_axis_prev: [f32; 8],
+    /// last value of each axis by code (to detect an axis being moved)
+    pad_axis_prev: std::collections::HashMap<u32, f32>,
+    /// KEEN_PAD_DEBUG=1: print the gamepad events
+    pad_debug: bool,
     pub surface: Surface,
     pub palette: Palette,
     pub border: u8,
@@ -233,9 +235,10 @@ impl Sys {
         Sys {
             win,
             fullscreen_pref: fullscreen,
-            pad: if headless { None } else { gilrs::Gilrs::new().ok() },
+            pad: if headless { None } else { open_pads() },
             pad_prev: [false; super::input::PAD_ACTIONS],
-            pad_axis_prev: [0.0; 8],
+            pad_axis_prev: Default::default(),
+            pad_debug: std::env::var("KEEN_PAD_DEBUG").is_ok_and(|v| v == "1"),
             surface,
             palette: Palette::default(),
             border: 0,
@@ -384,25 +387,49 @@ impl Sys {
     /// key"), the state actions `pad_save` / `pad_load`. While the control
     /// panel is open the pad navigates it, while binding an action the next
     /// input goes to `pad_captured`.
+    ///
+    /// Pads gilrs has no mapping for (e.g. many SNES style USB pads) report
+    /// raw codes: their X/Y axes and hat switch move as well, and in the
+    /// control panel face buttons (HID buttons 1-4) select, other buttons
+    /// back out, unless raw buttons are bound. KEEN_PAD_DEBUG=1 prints the
+    /// pads and their events.
     fn sync_pad(&mut self) {
         use super::input::*;
-        use gilrs::{Axis, EventType};
+        use gilrs::{Axis, Button, EventType, MappingSource};
         let Some(g) = &mut self.pad else { return };
         let i = &mut self.input;
         let mut captured = None;
+        // raw buttons of unmapped pads pressed in this poll
+        let (mut raw_face, mut raw_other) = (false, false);
         while let Some(ev) = g.next_event() {
+            if self.pad_debug {
+                let pad = g.gamepad(ev.id);
+                eprintln!("pad {} \"{}\" ({:?} mapping): {:?}", usize::from(ev.id), pad.name(), pad.mapping_source(), ev.event);
+            }
             match ev.event {
+                EventType::ButtonPressed(Button::Unknown, code) => {
+                    let c = code.into_u32();
+                    captured = captured.or(Some(PadInput::RawButton(c)));
+                    if c >> 16 == HID_BUTTON_PAGE && (1..=4).contains(&(c & 0xffff)) {
+                        raw_face = true;
+                    } else {
+                        raw_other = true;
+                    }
+                }
                 EventType::ButtonPressed(b, _) => {
                     if let Some(c) = PAD_BUTTONS.iter().position(|&x| x == b) {
                         captured = captured.or(Some(PadInput::Button(c as u8)));
                     }
                 }
-                EventType::AxisChanged(a, v, _) => {
-                    if let Some(c) = PAD_AXES.iter().position(|&x| x == a) {
-                        let prev = std::mem::replace(&mut self.pad_axis_prev[c], v);
-                        if v.abs() >= 0.7 && prev.abs() < 0.7 {
-                            captured = captured.or(Some(PadInput::Axis(c as u8, v > 0.0)));
-                        }
+                EventType::AxisChanged(a, v, code) => {
+                    let prev = self.pad_axis_prev.insert(code.into_u32(), v).unwrap_or(0.0);
+                    if v.abs() >= 0.7 && prev.abs() < 0.7 {
+                        let p = if a == Axis::Unknown {
+                            Some(PadInput::RawAxis(code.into_u32(), v > 0.0))
+                        } else {
+                            PAD_AXES.iter().position(|&x| x == a).map(|c| PadInput::Axis(c as u8, v > 0.0))
+                        };
+                        captured = captured.or(p);
                     }
                 }
                 _ => {}
@@ -414,8 +441,16 @@ impl Sys {
             for (k, &b) in i.pad_map.iter().enumerate() {
                 act[k] |= pad_active(&pad, b);
             }
-            let ax = pad.value(Axis::LeftStickX);
-            let ay = pad.value(Axis::LeftStickY);
+            let (ax, ay) = if pad.mapping_source() == MappingSource::None {
+                // unmapped: the raw X/Y axes or the hat switch (HID: down
+                // is positive)
+                let raw = |c: u32| raw_axis(&pad, c);
+                let x = if raw(HID_X) != 0.0 { raw(HID_X) } else { raw(HID_HAT_X) };
+                let y = if raw(HID_Y) != 0.0 { raw(HID_Y) } else { raw(HID_HAT_Y) };
+                (x, -y)
+            } else {
+                (pad.value(Axis::LeftStickX), pad.value(Axis::LeftStickY))
+            };
             act[PAD_LEFT] |= ax < -0.5;
             act[PAD_RIGHT] |= ax > 0.5;
             act[PAD_UP] |= ay > 0.5;
@@ -446,6 +481,14 @@ impl Sys {
             ] {
                 if pressed(k) {
                     i.last_scan = sc;
+                }
+            }
+            // unmapped pad whose buttons are not configured yet
+            if !i.pad_map.iter().any(|b| matches!(b, PadInput::RawButton(_))) {
+                if raw_face {
+                    i.last_scan = SC_RETURN;
+                } else if raw_other {
+                    i.last_scan = SC_ESCAPE;
                 }
             }
             return;
@@ -640,7 +683,50 @@ fn pad_active(pad: &gilrs::Gamepad, b: super::input::PadInput) -> bool {
                 v < -0.5
             }
         }
+        PadInput::RawButton(c) => pad.state().buttons().any(|(code, d)| code.into_u32() == c && d.is_pressed()),
+        PadInput::RawAxis(c, pos) => {
+            let v = raw_axis(pad, c);
+            if pos {
+                v > 0.5
+            } else {
+                v < -0.5
+            }
+        }
     }
+}
+
+/// The value of an axis by its platform code (0 if the pad has none).
+fn raw_axis(pad: &gilrs::Gamepad, c: u32) -> f32 {
+    pad.state().axes().find(|(code, _)| code.into_u32() == c).map_or(0.0, |(_, d)| d.value())
+}
+
+/// Opens the gamepad library; with KEEN_PAD_DEBUG=1 lists the pads.
+///
+/// Without the default filters: gilrs' `axis_dpad_to_button` only turns a
+/// d-pad axis into button presses at exactly +-1.0 and drops the axis
+/// event otherwise, so pads whose d-pad is an axis pair 0..255 (e.g. the
+/// Retrolink SNES controller, -0.992..1.0) lost up and left. `pad_active`
+/// reads the d-pad axes itself; the thresholds replace the deadzone.
+fn open_pads() -> Option<gilrs::Gilrs> {
+    let g = match gilrs::GilrsBuilder::new().with_default_filters(false).build() {
+        Ok(g) => g,
+        Err(e) => {
+            eprintln!("gamepads not available: {}", e);
+            return None;
+        }
+    };
+    if std::env::var("KEEN_PAD_DEBUG").is_ok_and(|v| v == "1") {
+        for (id, pad) in g.gamepads() {
+            eprintln!(
+                "pad {} \"{}\" ({:?} mapping, uuid {:02x?})",
+                usize::from(id),
+                pad.name(),
+                pad.mapping_source(),
+                pad.uuid()
+            );
+        }
+    }
+    Some(g)
 }
 
 /// Scales the logical picture (`src`, any multiple of its logical size)

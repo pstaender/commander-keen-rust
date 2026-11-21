@@ -115,7 +115,8 @@ B = pogo, X = fire, Start = control panel, LB = save state, RB = load
 the last saved state (`saves/STATE.CKn`, separate from the six saved
 games). With a gamepad connected, CONFIGURE → USE GAMEPAD lets you
 rebind movement and buttons (Enter, then press the button or move the
-stick; Esc cancels, Backspace clears). The left stick always moves too.
+stick; Esc cancels, Backspace clears). The left stick always moves too. Pads without a known mapping work as
+well: their d-pad/stick moves, and any button can be bound in the menu.
 In the control panel the gamepad navigates: d-pad/stick, A = select,
 B/Start = back.
 
@@ -258,6 +259,7 @@ Environment variables (mostly for use with `--headless`):
 | `KEEN_SHOT_EVERY=n` | …every n-th frame (default 35) |
 | `KEEN_MAX_FRAMES=n` | quit after n frames |
 | `KEEN_KEYS="frame:scancode[+frames],..."` | scripted key presses |
+| `KEEN_PAD_DEBUG=1` | print the detected gamepads (name, mapping) and all their events |
 | `KEEN_TRACE=file` | log the player's map/x/y/sprite per game frame |
 | `KEEN_RENDER_WAV="song:N:file.wav"` | render music (or `pc:N:…`, `adlib:N:…` for sounds) to WAV and exit |
 

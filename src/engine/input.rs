@@ -337,17 +337,49 @@ pub enum PadInput {
     Button(u8),
     /// axis code, positive direction
     Axis(u8, bool),
+    /// a button of a pad gilrs has no mapping for (platform code, see
+    /// gilrs `Code::into_u32`; on macOS HID usage page << 16 | usage)
+    RawButton(u32),
+    /// an axis of an unmapped pad (platform code, positive direction;
+    /// HID axes are positive to the right and downwards)
+    RawAxis(u32, bool),
 }
 
+/// HID generic desktop usages of the raw axes of unmapped pads.
+pub const HID_X: u32 = 0x1_0030;
+pub const HID_Y: u32 = 0x1_0031;
+/// gilrs reports a hat switch as two axes (usage, usage + 1)
+pub const HID_HAT_X: u32 = 0x1_0039;
+pub const HID_HAT_Y: u32 = 0x1_003a;
+/// HID button usage page
+pub const HID_BUTTON_PAGE: u32 = 9;
+
 impl PadInput {
-    pub fn name(self) -> &'static str {
+    pub fn name(self) -> String {
         match self {
-            PadInput::None => "-",
-            PadInput::Button(c) => PAD_BUTTON_NAMES.get(c as usize).copied().unwrap_or("?"),
+            PadInput::None => "-".into(),
+            PadInput::Button(c) => PAD_BUTTON_NAMES.get(c as usize).copied().unwrap_or("?").into(),
             PadInput::Axis(c, pos) => {
-                PAD_AXIS_NAMES.get(c as usize).map(|&(n, p)| if pos { p } else { n }).unwrap_or("?")
+                PAD_AXIS_NAMES.get(c as usize).map(|&(n, p)| if pos { p } else { n }).unwrap_or("?").into()
+            }
+            PadInput::RawButton(c) if c >> 16 == HID_BUTTON_PAGE => format!("BTN {}", c & 0xffff),
+            PadInput::RawButton(c) => format!("B{:X}", c),
+            PadInput::RawAxis(c, pos) => {
+                let (n, p) = match c {
+                    HID_X => ("X LEFT", "X RIGHT"),
+                    HID_Y => ("Y UP", "Y DOWN"),
+                    HID_HAT_X => ("HAT LEFT", "HAT RIGHT"),
+                    HID_HAT_Y => ("HAT UP", "HAT DOWN"),
+                    _ => return format!("AX{:X}{}", c & 0xffff, if pos { '+' } else { '-' }),
+                };
+                (if pos { p } else { n }).into()
             }
         }
+    }
+
+    /// Bound to an input of a pad without a gilrs mapping.
+    pub fn is_raw(self) -> bool {
+        matches!(self, PadInput::RawButton(_) | PadInput::RawAxis(..))
     }
 
     /// Config file form: `b4`, `a1+`, `a0-` or `none`.
@@ -356,12 +388,21 @@ impl PadInput {
             PadInput::None => "none".into(),
             PadInput::Button(c) => format!("b{}", c),
             PadInput::Axis(c, pos) => format!("a{}{}", c, if pos { '+' } else { '-' }),
+            PadInput::RawButton(c) => format!("rb{}", c),
+            PadInput::RawAxis(c, pos) => format!("ra{}{}", c, if pos { '+' } else { '-' }),
         }
     }
 
     pub fn parse(s: &str) -> Option<PadInput> {
         if s == "none" {
             return Some(PadInput::None);
+        }
+        if let Some(n) = s.strip_prefix("rb") {
+            return Some(PadInput::RawButton(n.parse().ok()?));
+        }
+        if let Some(a) = s.strip_prefix("ra") {
+            let (n, pos) = if let Some(n) = a.strip_suffix('+') { (n, true) } else { (a.strip_suffix('-')?, false) };
+            return Some(PadInput::RawAxis(n.parse().ok()?, pos));
         }
         if let Some(n) = s.strip_prefix('b') {
             let c: u8 = n.parse().ok()?;
@@ -510,10 +551,18 @@ mod pad_tests {
 
     #[test]
     fn pad_input_round_trip() {
-        for p in default_pad_map().into_iter().chain([PadInput::None, PadInput::Axis(1, true), PadInput::Axis(7, false)]) {
+        for p in default_pad_map().into_iter().chain([
+            PadInput::None,
+            PadInput::Axis(1, true),
+            PadInput::Axis(7, false),
+            PadInput::RawButton(0x9_0003),
+            PadInput::RawAxis(HID_Y, false),
+        ]) {
             assert_eq!(PadInput::parse(&p.encode()), Some(p));
         }
         assert_eq!(PadInput::Axis(1, true).name(), "LS UP");
+        assert_eq!(PadInput::RawButton(0x9_0003).name(), "BTN 3");
+        assert_eq!(PadInput::RawAxis(HID_Y, true).name(), "Y DOWN");
         assert_eq!(PadInput::parse("b99"), None);
         assert_eq!(PadInput::parse("a9+"), None);
     }

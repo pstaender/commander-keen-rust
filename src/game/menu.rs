@@ -1298,10 +1298,10 @@ impl Game {
             self.draw_tile8(ix + PADBOX_X + (PADBOX_W - 8) / 2, iy, CP_KEYCURSORTILE);
         } else {
             let name = self.sys.input.pad_map[action].name();
-            let (w, _) = self.cp_measure(name);
+            let (w, _) = self.cp_measure(&name);
             self.menu.px = ix + PADBOX_X + (PADBOX_W - w) / 2;
             self.menu.py = iy + 1;
-            self.cp_draw_string(name);
+            self.cp_draw_string(&name);
         }
         self.tw.fontcolor = 15;
     }
