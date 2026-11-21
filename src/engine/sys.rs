@@ -162,6 +162,10 @@ pub struct Sys {
     /// fullscreen setting, kept without a window (headless) for the config
     fullscreen_pref: bool,
     pad: Option<gilrs::Gilrs>,
+    /// gamepad actions held in the last poll (for presses)
+    pad_prev: [bool; super::input::PAD_ACTIONS],
+    /// last value of each binding axis (to detect an axis being moved)
+    pad_axis_prev: [f32; 8],
     pub surface: Surface,
     pub palette: Palette,
     pub border: u8,
@@ -174,7 +178,7 @@ pub struct Sys {
     /// force a fixed TimeCount progression (headless/testing)
     pub headless_time: Option<i64>,
     pub fullscreen_aspect: bool,
-    /// debugging: save every Nth presented frame to KEEN6_SHOT_DIR
+    /// debugging: save every Nth presented frame to KEEN_SHOT_DIR
     frame: u64,
     shot_dir: Option<std::path::PathBuf>,
     shot_every: u64,
@@ -230,10 +234,13 @@ impl Sys {
             win,
             fullscreen_pref: fullscreen,
             pad: if headless { None } else { gilrs::Gilrs::new().ok() },
+            pad_prev: [false; super::input::PAD_ACTIONS],
+            pad_axis_prev: [0.0; 8],
             surface,
             palette: Palette::default(),
             border: 0,
-            input: Input::default(),
+            // headless testing: KEEN_PAD=1 pretends a gamepad is connected
+            input: Input { pad_connected: headless && std::env::var("KEEN_PAD").is_ok_and(|v| v == "1"), ..Input::default() },
             start: Instant::now(),
             time_offset: 0,
             quit: false,
@@ -241,10 +248,10 @@ impl Sys {
             headless_time: if headless { Some(0) } else { None },
             fullscreen_aspect: aspect,
             frame: 0,
-            shot_dir: std::env::var("KEEN6_SHOT_DIR").ok().map(std::path::PathBuf::from),
-            shot_every: std::env::var("KEEN6_SHOT_EVERY").ok().and_then(|v| v.parse().ok()).unwrap_or(35),
-            max_frames: std::env::var("KEEN6_MAX_FRAMES").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
-            script: std::env::var("KEEN6_KEYS")
+            shot_dir: std::env::var("KEEN_SHOT_DIR").ok().map(std::path::PathBuf::from),
+            shot_every: std::env::var("KEEN_SHOT_EVERY").ok().and_then(|v| v.parse().ok()).unwrap_or(35),
+            max_frames: std::env::var("KEEN_MAX_FRAMES").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
+            script: std::env::var("KEEN_KEYS")
                 .map(|v| {
                     // "frame:scancode[+frames],..." with hex or decimal scan codes
                     v.split(',')
@@ -337,8 +344,8 @@ impl Sys {
     /// `MAX_VIEW_W`. 320 without a window.
     pub fn wide_width(&self) -> usize {
         let Some(window) = self.win.as_ref().and_then(|(_, w)| w.window.as_ref()) else {
-            // headless testing: KEEN6_VIEW_W=n simulates a wide window
-            let w = std::env::var("KEEN6_VIEW_W").ok().and_then(|v| v.parse().ok()).unwrap_or(SCREEN_W);
+            // headless testing: KEEN_VIEW_W=n simulates a wide window
+            let w = std::env::var("KEEN_VIEW_W").ok().and_then(|v| v.parse().ok()).unwrap_or(SCREEN_W);
             return (w & !1).clamp(SCREEN_W, MAX_VIEW_W);
         };
         let size = window.inner_size();
@@ -371,47 +378,91 @@ impl Sys {
         }
     }
 
-    /// Reads gamepads: stick/d-pad = movement, A = jump, B = pogo,
-    /// X/Y = fire, Start = Esc (control panel).
+    /// Reads gamepads through the bindings in `input.pad_map` (the left
+    /// stick always moves as well): movement and the jump / pogo / fire
+    /// buttons are held states, MENU sets Esc, jump Space (for "press a
+    /// key"), the state actions `pad_save` / `pad_load`. While the control
+    /// panel is open the pad navigates it, while binding an action the next
+    /// input goes to `pad_captured`.
     fn sync_pad(&mut self) {
-        use gilrs::{Axis, Button, EventType};
+        use super::input::*;
+        use gilrs::{Axis, EventType};
         let Some(g) = &mut self.pad else { return };
-        let mut press: Vec<u8> = Vec::new();
+        let i = &mut self.input;
+        let mut captured = None;
         while let Some(ev) = g.next_event() {
-            if let EventType::ButtonPressed(b, _) = ev.event {
-                match b {
-                    Button::Start => press.push(super::input::SC_ESCAPE),
-                    Button::South => press.push(super::input::SC_SPACE),
-                    _ => {}
+            match ev.event {
+                EventType::ButtonPressed(b, _) => {
+                    if let Some(c) = PAD_BUTTONS.iter().position(|&x| x == b) {
+                        captured = captured.or(Some(PadInput::Button(c as u8)));
+                    }
                 }
+                EventType::AxisChanged(a, v, _) => {
+                    if let Some(c) = PAD_AXES.iter().position(|&x| x == a) {
+                        let prev = std::mem::replace(&mut self.pad_axis_prev[c], v);
+                        if v.abs() >= 0.7 && prev.abs() < 0.7 {
+                            captured = captured.or(Some(PadInput::Axis(c as u8, v > 0.0)));
+                        }
+                    }
+                }
+                _ => {}
             }
         }
-        let i = &mut self.input;
+        i.pad_connected = g.gamepads().next().is_some();
+        let mut act = [false; PAD_ACTIONS];
+        for (_, pad) in g.gamepads() {
+            for (k, &b) in i.pad_map.iter().enumerate() {
+                act[k] |= pad_active(&pad, b);
+            }
+            let ax = pad.value(Axis::LeftStickX);
+            let ay = pad.value(Axis::LeftStickY);
+            act[PAD_LEFT] |= ax < -0.5;
+            act[PAD_RIGHT] |= ax > 0.5;
+            act[PAD_UP] |= ay > 0.5;
+            act[PAD_DOWN] |= ay < -0.5;
+        }
+        let prev = std::mem::replace(&mut self.pad_prev, act);
+        let pressed = |k: usize| act[k] && !prev[k];
         i.pad_x = 0;
         i.pad_y = 0;
         i.pad_jump = false;
         i.pad_pogo = false;
         i.pad_fire = false;
-        for (_, pad) in g.gamepads() {
-            let ax = pad.value(Axis::LeftStickX);
-            let ay = pad.value(Axis::LeftStickY);
-            if ax < -0.5 || pad.is_pressed(Button::DPadLeft) {
-                i.pad_x = -1;
-            } else if ax > 0.5 || pad.is_pressed(Button::DPadRight) {
-                i.pad_x = 1;
+        if i.pad_capture {
+            if captured.is_some() {
+                i.pad_captured = captured;
             }
-            if ay > 0.5 || pad.is_pressed(Button::DPadUp) {
-                i.pad_y = -1;
-            } else if ay < -0.5 || pad.is_pressed(Button::DPadDown) {
-                i.pad_y = 1;
+            return;
+        }
+        if i.pad_menu_nav {
+            for (k, sc) in [
+                (PAD_UP, SC_UPARROW),
+                (PAD_DOWN, SC_DOWNARROW),
+                (PAD_LEFT, SC_LEFTARROW),
+                (PAD_RIGHT, SC_RIGHTARROW),
+                (PAD_JUMP, SC_RETURN),
+                (PAD_POGO, SC_ESCAPE),
+                (PAD_MENU, SC_ESCAPE),
+            ] {
+                if pressed(k) {
+                    i.last_scan = sc;
+                }
             }
-            i.pad_jump |= pad.is_pressed(Button::South);
-            i.pad_pogo |= pad.is_pressed(Button::East);
-            i.pad_fire |= pad.is_pressed(Button::West) || pad.is_pressed(Button::North);
+            return;
         }
-        for sc in press {
-            i.last_scan = sc;
+        i.pad_x = if act[PAD_LEFT] { -1 } else if act[PAD_RIGHT] { 1 } else { 0 };
+        i.pad_y = if act[PAD_UP] { -1 } else if act[PAD_DOWN] { 1 } else { 0 };
+        i.pad_jump = act[PAD_JUMP];
+        i.pad_pogo = act[PAD_POGO];
+        i.pad_fire = act[PAD_FIRE];
+        if pressed(PAD_JUMP) {
+            i.last_scan = SC_SPACE;
         }
+        if pressed(PAD_MENU) {
+            i.last_scan = SC_ESCAPE;
+        }
+        i.pad_save |= pressed(PAD_SAVESTATE);
+        i.pad_load |= pressed(PAD_LOADSTATE);
     }
 
     fn sync_keys(&mut self) {
@@ -545,6 +596,50 @@ impl Sys {
             }
         }
         self.sync_keys();
+    }
+}
+
+/// Gamepad buttons by binding code (names in `input::PAD_BUTTON_NAMES`).
+const PAD_BUTTONS: [gilrs::Button; 19] = {
+    use gilrs::Button::*;
+    [
+        South, East, West, North, LeftTrigger, LeftTrigger2, RightTrigger, RightTrigger2, Select, Start, Mode, LeftThumb,
+        RightThumb, DPadUp, DPadDown, DPadLeft, DPadRight, C, Z,
+    ]
+};
+
+/// Gamepad axes by binding code (names in `input::PAD_AXIS_NAMES`).
+const PAD_AXES: [gilrs::Axis; 8] = {
+    use gilrs::Axis::*;
+    [LeftStickX, LeftStickY, RightStickX, RightStickY, LeftZ, RightZ, DPadX, DPadY]
+};
+
+/// Whether a bound gamepad input is held. A d-pad button also reads the
+/// d-pad axes (some pads report the d-pad as a hat).
+fn pad_active(pad: &gilrs::Gamepad, b: super::input::PadInput) -> bool {
+    use super::input::PadInput;
+    match b {
+        PadInput::None => false,
+        PadInput::Button(c) => {
+            let Some(&btn) = PAD_BUTTONS.get(c as usize) else { return false };
+            let hat = match c {
+                13 => pad.value(gilrs::Axis::DPadY) > 0.5,
+                14 => pad.value(gilrs::Axis::DPadY) < -0.5,
+                15 => pad.value(gilrs::Axis::DPadX) < -0.5,
+                16 => pad.value(gilrs::Axis::DPadX) > 0.5,
+                _ => false,
+            };
+            pad.is_pressed(btn) || hat
+        }
+        PadInput::Axis(c, pos) => {
+            let Some(&axis) = PAD_AXES.get(c as usize) else { return false };
+            let v = pad.value(axis);
+            if pos {
+                v > 0.5
+            } else {
+                v < -0.5
+            }
+        }
     }
 }
 

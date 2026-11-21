@@ -20,7 +20,9 @@ runtime and are never committed.
   320x200 coordinates + EGA palette fades, `gfx.rs` texture sets and
   high-res replacement packs, `sound.rs` ID_SD emulation (560/140 Hz timing,
   OPL2 via `oplon`, PC speaker) with replacement audio (rodio, rustysynth),
-  `input.rs` scan codes / ControlInfo.
+  `input.rs` scan codes / ControlInfo, gamepad bindings (`PadInput`,
+  `pad_map`; read in `Sys::sync_pad`, set up in the menu's PADCARD).
+  Headless: `KEEN_PAD=1` pretends a gamepad is connected.
 - `src/game/` – the shared CK_* modules, ported function by function from
   the decompilation. Like the original source (one set of files with
   `#ifdef`s) they are compiled once per episode module (`src/ckN/mod.rs`
@@ -47,7 +49,7 @@ runtime and are never committed.
   `palette.rs`, `edit.rs` brushes/fill/resize/undo, `info.rs` info plane
   values per episode and sprite previews (runs `scan_info_plane` on a tiny
   map in a headless `Game` of the episode), `render.rs` tile atlases. Testing aid:
-  `KEEN6_EDITOR_SHOT=file.png [KEEN6_EDITOR_SETUP=layer=2,zoom=2,…]` saves
+  `KEEN_EDITOR_SHOT=file.png [KEEN_EDITOR_SETUP=layer=2,zoom=2,…]` saves
   the editor's own screenshot and exits.
 - `tools/` – Python helpers (run with `python3 -I`, `EP=4|5|6` selects the
   episode, default 6): `unlzexe.py`, `gen_states.py`, `dis.py` (ndisasm
@@ -85,12 +87,12 @@ runtime and are never committed.
 - `cargo build --release` (game), `cargo build --release --workspace`
   (game + editor)
 - `./target/release/keen4|keen5|keen6 [--data DIR]` (options: `--help`)
-- Testing without a window: `--headless`, env `KEEN6_SHOT_DIR=dir
-  KEEN6_SHOT_EVERY=n KEEN6_MAX_FRAMES=n` saves PNG frames; `--demo N` replays
+- Testing without a window: `--headless`, env `KEEN_SHOT_DIR=dir
+  KEEN_SHOT_EVERY=n KEEN_MAX_FRAMES=n` saves PNG frames; `--demo N` replays
   original demo N; `--level N` starts a map directly.
 - `--dump DIR` exports all graphics as PNG (base for high-res packs).
 - Keen 6 must stay identical: the four original demos are compared with
-  reference traces (`KEEN6_TRACE=file keen6 --demo N`, see
+  reference traces (`KEEN_TRACE=file keen6 --demo N`, see
   claude_history.log).
 - Re-analysis: `python3 -I tools/unlzexe.py KEEN6/KEEN6C.EXE re/KEEN6C_unpacked.exe`
   (K4: `re/k4/KEEN4E_unpacked.exe`, K5: `re/k5/KEEN5E_unpacked.exe`), then

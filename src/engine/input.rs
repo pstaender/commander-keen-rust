@@ -292,6 +292,95 @@ impl Default for KeyboardDef {
     }
 }
 
+/// Gamepad actions (indices into `Input::pad_map`).
+pub const PAD_UP: usize = 0;
+pub const PAD_DOWN: usize = 1;
+pub const PAD_LEFT: usize = 2;
+pub const PAD_RIGHT: usize = 3;
+pub const PAD_JUMP: usize = 4;
+pub const PAD_POGO: usize = 5;
+pub const PAD_FIRE: usize = 6;
+/// opens the control panel (like Esc)
+pub const PAD_MENU: usize = 7;
+pub const PAD_SAVESTATE: usize = 8;
+pub const PAD_LOADSTATE: usize = 9;
+pub const PAD_ACTIONS: usize = 10;
+
+/// config file keys of the gamepad actions
+pub const PAD_ACTION_KEYS: [&str; PAD_ACTIONS] =
+    ["pad_up", "pad_down", "pad_left", "pad_right", "pad_jump", "pad_pogo", "pad_fire", "pad_menu", "pad_savestate", "pad_loadstate"];
+
+/// Names of the gamepad buttons, by code (the order of `sys::PAD_BUTTONS`,
+/// Xbox style labels).
+pub const PAD_BUTTON_NAMES: [&str; 19] = [
+    "A", "B", "X", "Y", "LB", "LT", "RB", "RT", "SELECT", "START", "GUIDE", "L3", "R3", "D-UP", "D-DOWN", "D-LEFT",
+    "D-RIGHT", "C", "Z",
+];
+
+/// Names of the gamepad axis directions (negative, positive), by code (the
+/// order of `sys::PAD_AXES`; gilrs Y axes are positive upwards).
+pub const PAD_AXIS_NAMES: [(&str, &str); 8] = [
+    ("LS LEFT", "LS RIGHT"),
+    ("LS DOWN", "LS UP"),
+    ("RS LEFT", "RS RIGHT"),
+    ("RS DOWN", "RS UP"),
+    ("LZ -", "LZ +"),
+    ("RZ -", "RZ +"),
+    ("D-LEFT", "D-RIGHT"),
+    ("D-DOWN", "D-UP"),
+];
+
+/// What a gamepad action is bound to: a button or one direction of an axis.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PadInput {
+    None,
+    Button(u8),
+    /// axis code, positive direction
+    Axis(u8, bool),
+}
+
+impl PadInput {
+    pub fn name(self) -> &'static str {
+        match self {
+            PadInput::None => "-",
+            PadInput::Button(c) => PAD_BUTTON_NAMES.get(c as usize).copied().unwrap_or("?"),
+            PadInput::Axis(c, pos) => {
+                PAD_AXIS_NAMES.get(c as usize).map(|&(n, p)| if pos { p } else { n }).unwrap_or("?")
+            }
+        }
+    }
+
+    /// Config file form: `b4`, `a1+`, `a0-` or `none`.
+    pub fn encode(self) -> String {
+        match self {
+            PadInput::None => "none".into(),
+            PadInput::Button(c) => format!("b{}", c),
+            PadInput::Axis(c, pos) => format!("a{}{}", c, if pos { '+' } else { '-' }),
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<PadInput> {
+        if s == "none" {
+            return Some(PadInput::None);
+        }
+        if let Some(n) = s.strip_prefix('b') {
+            let c: u8 = n.parse().ok()?;
+            return ((c as usize) < PAD_BUTTON_NAMES.len()).then_some(PadInput::Button(c));
+        }
+        let a = s.strip_prefix('a')?;
+        let (n, pos) = if let Some(n) = a.strip_suffix('+') { (n, true) } else { (a.strip_suffix('-')?, false) };
+        let c: u8 = n.parse().ok()?;
+        ((c as usize) < PAD_AXIS_NAMES.len()).then_some(PadInput::Axis(c, pos))
+    }
+}
+
+/// The default gamepad layout: d-pad moves (the left stick always moves
+/// too), A jump, B pogo, X fire, START menu, LB save state, RB load state.
+pub fn default_pad_map() -> [PadInput; PAD_ACTIONS] {
+    use PadInput::Button as B;
+    [B(13), B(14), B(15), B(16), B(0), B(1), B(2), B(9), B(4), B(6)]
+}
+
 pub struct Input {
     /// gamepad state (merged into the keyboard controls)
     pub pad_x: i32,
@@ -299,6 +388,20 @@ pub struct Input {
     pub pad_jump: bool,
     pub pad_pogo: bool,
     pub pad_fire: bool,
+    /// a gamepad is connected
+    pub pad_connected: bool,
+    /// gamepad bindings, indexed by PAD_UP..PAD_LOADSTATE
+    pub pad_map: [PadInput; PAD_ACTIONS],
+    /// the save / load state actions were pressed (consumed by the game)
+    pub pad_save: bool,
+    pub pad_load: bool,
+    /// control panel open: the gamepad navigates it (directions = arrows,
+    /// jump = Enter, pogo / menu = Esc)
+    pub pad_menu_nav: bool,
+    /// binding a gamepad action: the next button / axis movement goes to
+    /// `pad_captured` instead of the game
+    pub pad_capture: bool,
+    pub pad_captured: Option<PadInput>,
     pub keyboard: [bool; 128],
     pub last_scan: ScanCode,
     /// `last_scan` came from keyboard auto repeat, not a new press
@@ -320,6 +423,13 @@ impl Default for Input {
             pad_jump: false,
             pad_pogo: false,
             pad_fire: false,
+            pad_connected: false,
+            pad_map: default_pad_map(),
+            pad_save: false,
+            pad_load: false,
+            pad_menu_nav: false,
+            pad_capture: false,
+            pad_captured: None,
             keyboard: [false; 128],
             last_scan: 0, last_repeat: false, masked: [false; 128], last_ascii: 0, paused: false, key_def: KeyboardDef::default() }
     }
@@ -335,6 +445,8 @@ impl Input {
             *m |= *k;
         }
         self.keyboard = [false; 128];
+        self.pad_save = false;
+        self.pad_load = false;
         self.last_scan = SC_NONE;
         self.last_ascii = 0;
     }
@@ -389,5 +501,20 @@ impl Input {
             button0: k(d.button0) || self.pad_jump,
             button1: k(d.button1) || self.pad_pogo,
             button2: false, xaxis: mx, yaxis: my, dir }
+    }
+}
+
+#[cfg(test)]
+mod pad_tests {
+    use super::*;
+
+    #[test]
+    fn pad_input_round_trip() {
+        for p in default_pad_map().into_iter().chain([PadInput::None, PadInput::Axis(1, true), PadInput::Axis(7, false)]) {
+            assert_eq!(PadInput::parse(&p.encode()), Some(p));
+        }
+        assert_eq!(PadInput::Axis(1, true).name(), "LS UP");
+        assert_eq!(PadInput::parse("b99"), None);
+        assert_eq!(PadInput::parse("a9+"), None);
     }
 }

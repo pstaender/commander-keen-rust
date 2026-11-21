@@ -110,7 +110,13 @@ focus. They come back when you switch to another app, and while Cmd is held,
 so Cmd+Tab and Cmd+Space keep working. `--system-shortcuts` disables this.
 
 Gamepads work without calibration: stick or d-pad to move, A = jump,
-B = pogo, X/Y = fire, Start = control panel.
+B = pogo, X = fire, Start = control panel, LB = save state, RB = load
+the last saved state (`saves/STATE.CKn`, separate from the six saved
+games). With a gamepad connected, CONFIGURE → USE GAMEPAD lets you
+rebind movement and buttons (Enter, then press the button or move the
+stick; Esc cancels, Backspace clears). The left stick always moves too.
+In the control panel the gamepad navigates: d-pad/stick, A = select,
+B/Start = back.
 
 ### Debug keys (`--debug-shortcuts`)
 
@@ -247,12 +253,12 @@ Environment variables (mostly for use with `--headless`):
 
 | Variable | Effect |
 |---|---|
-| `KEEN6_SHOT_DIR=dir` | save presented frames as PNG |
-| `KEEN6_SHOT_EVERY=n` | …every n-th frame (default 35) |
-| `KEEN6_MAX_FRAMES=n` | quit after n frames |
-| `KEEN6_KEYS="frame:scancode[+frames],..."` | scripted key presses |
-| `KEEN6_TRACE=file` | log the player's map/x/y/sprite per game frame |
-| `KEEN6_RENDER_WAV="song:N:file.wav"` | render music (or `pc:N:…`, `adlib:N:…` for sounds) to WAV and exit |
+| `KEEN_SHOT_DIR=dir` | save presented frames as PNG |
+| `KEEN_SHOT_EVERY=n` | …every n-th frame (default 35) |
+| `KEEN_MAX_FRAMES=n` | quit after n frames |
+| `KEEN_KEYS="frame:scancode[+frames],..."` | scripted key presses |
+| `KEEN_TRACE=file` | log the player's map/x/y/sprite per game frame |
+| `KEEN_RENDER_WAV="song:N:file.wav"` | render music (or `pc:N:…`, `adlib:N:…` for sounds) to WAV and exit |
 
 `tools/dosbox_trace.py` (`EP=4|5|6`) and `tools/compare_trace.py` record the
 same trace from the original game running in DOSBox Staging

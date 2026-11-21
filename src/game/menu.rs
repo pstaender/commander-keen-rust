@@ -69,6 +69,9 @@ const COMPSCOREDSND: i32 = ep_sel!(0x32, 0x31, 0x31);
 const KEENSCOREDSND: i32 = ep_sel!(0x33, 0x32, 0x32);
 
 const BACKCOLOR: u8 = 8;
+/// gamepad binding entries: x offset and width of the button box
+const PADBOX_X: i32 = 0x50;
+const PADBOX_W: i32 = 0x40;
 const TICKBASE: i32 = 70;
 /// cstackptr may go up to 6
 const MAXCARDS: usize = 7;
@@ -100,6 +103,14 @@ const GAMEPADCARD: usize = 17;
 const JERKCARD: usize = 18;
 /// --cheatmode: the "CHEAT OPTIONS" card (replaces END GAME)
 const CHEATCARD: usize = 19;
+/// a gamepad is connected: "USE GAMEPAD" (replaces the joystick entries
+/// of the config card) and its movement / button binding cards
+const PADCARD: usize = 20;
+const PADMOVECARD: usize = 21;
+const PADBUTTONSCARD: usize = 22;
+/// the gamepad actions of the PADMOVECARD and PADBUTTONSCARD entries
+const PADMOVE_ACTIONS: [usize; 4] = [PAD_UP, PAD_DOWN, PAD_LEFT, PAD_RIGHT];
+const PADBUTTON_ACTIONS: [usize; 6] = [PAD_JUMP, PAD_POGO, PAD_FIRE, PAD_MENU, PAD_SAVESTATE, PAD_LOADSTATE];
 /// most lives / shots the cheat card adds (the score box shows two digits)
 const CHEATMAX: i32 = 99;
 
@@ -145,6 +156,10 @@ enum Custom {
     Gamepad,
     /// --cheatmode card (not in the original)
     Cheat,
+    /// gamepad card (not in the original)
+    Pad,
+    /// gamepad binding cards (not in the original)
+    PadSet,
 }
 
 #[derive(Clone)]
@@ -309,6 +324,35 @@ fn build_cards() -> Vec<Card> {
             0,
             vec![b(0x26, "ADD EXTRA LIFE", 0), b(0x1f, "ADD EXTRA SHOT", 0), b(0x13, "ALLOW RE-ENTER", 0)],
             Custom::Cheat,
+            0,
+        ),
+        // PADCARD, PADMOVECARD, PADBUTTONSCARD (not in the original)
+        card(
+            8,
+            0,
+            0,
+            vec![
+                f(0x32, "CONFIGURE MOVEMENT", PADMOVECARD),
+                f(0x30, "CONFIGURE BUTTONS", PADBUTTONSCARD),
+                item(UII_BUTTON, UI_SEPARATED, 0x20, "DEFAULT LAYOUT", 0, None),
+            ],
+            Custom::Pad,
+            0,
+        ),
+        card(0, 0, 0, vec![b(0x16, "UP", 0), b(0x20, "DOWN", 0), b(0x26, "LEFT", 0), b(0x13, "RIGHT", 0)], Custom::PadSet, 0),
+        card(
+            0,
+            0,
+            0,
+            vec![
+                b(0x24, "JUMP", 0),
+                b(0x19, "POGO", 0),
+                b(0x21, "FIRE", 0),
+                b(0x32, "MENU", 0),
+                b(0x1f, "SAVE STATE", 0),
+                b(0x26, "LOAD STATE", 0),
+            ],
+            Custom::PadSet,
             0,
         ),
     ];
@@ -983,6 +1027,8 @@ impl Game {
             Custom::Jerk => self.usl_jerk_custom(call),
             Custom::Gamepad => false,
             Custom::Cheat => self.usl_cheat_custom(call, i),
+            Custom::Pad => self.usl_pad_custom(call, i),
+            Custom::PadSet => self.usl_pad_set_custom(call, i),
         }
     }
 
@@ -1002,7 +1048,8 @@ impl Game {
             // which is only enabled with a joystick control (never here)
             it[2].text = if jerk { "FIX JERKY MOTION (ON)" } else { "FIX JERKY MOTION (OFF)" };
             let ct = self.menu.controltype;
-            let g = &mut self.menu.cards[CONFIGCARD].items[6];
+            let items = &mut self.menu.cards[CONFIGCARD].items;
+            let Some(g) = items.iter_mut().find(|it| it.child == Some(GAMEPADCARD)) else { return };
             g.flags |= UI_DISABLED;
             if ct == 2 || ct == 3 {
                 g.flags &= !UI_DISABLED;
@@ -1173,6 +1220,131 @@ impl Game {
         }
     }
 
+    /// The title of a card without a title picture (the cards added by
+    /// this port).
+    fn usl_draw_text_title(&mut self, s: &str) {
+        let (w, _) = self.cp_measure(s);
+        self.cp_hlin(0x4d, 0xe7, 0x37, 10);
+        self.menu.px = ((0xa0 - w) as u16 >> 1) as i32 + 0x4a;
+        self.menu.py = 0x31;
+        self.tw.fontcolor = 10;
+        self.cp_draw_string(s);
+        self.tw.fontcolor = 15;
+    }
+
+    /// Gamepad card (not in the original): the binding folders and the
+    /// default layout.
+    fn usl_pad_custom(&mut self, call: i32, i: Option<usize>) -> bool {
+        match call {
+            UIC_TOUCHUPCARD => {
+                self.usl_draw_text_title("GAMEPAD");
+                false
+            }
+            UIC_HIT if i == Some(2) => {
+                self.sys.input.pad_map = default_pad_map();
+                self.usl_ctl_dialog("Default gamepad layout", "Press any key", None);
+                self.usl_draw_ctl_panel();
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Gamepad binding cards (not in the original): action name and the
+    /// bound button; Enter waits for the new button or stick direction.
+    fn usl_pad_set_custom(&mut self, call: i32, i: Option<usize>) -> bool {
+        let top = self.cp_top();
+        let i = i.unwrap_or(0);
+        let action = if top == PADMOVECARD { PADMOVE_ACTIONS.get(i) } else { PADBUTTON_ACTIONS.get(i) };
+        let action = action.copied().unwrap_or(PAD_UP);
+        match call {
+            UIC_TOUCHUPCARD => {
+                self.usl_draw_text_title(if top == PADMOVECARD { "GAMEPAD MOVEMENT" } else { "GAMEPAD BUTTONS" });
+                false
+            }
+            UIC_DRAW => {
+                self.usl_draw_pad_item(i, action, false);
+                true
+            }
+            UIC_HIT => {
+                self.usl_draw_pad_item(i, action, false);
+                self.usl_pad_set_button(i, action);
+                self.usl_draw_ctl_panel();
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// One gamepad binding entry: the action name and a box with the bound
+    /// input (or the blinking cursor while waiting for it).
+    fn usl_draw_pad_item(&mut self, i: usize, action: usize, cursor: bool) {
+        let top = self.cp_top();
+        let y = self.cp_item(top, i).y;
+        self.cp_bar(0x4b, y, 0x9f, 8, BACKCOLOR);
+        self.usl_draw_item_icon(i);
+        let it = self.cp_item(top, i);
+        let (ix, iy, text) = (it.x, it.y, it.text);
+        self.tw.fontcolor = if it.flags & UI_SELECTED == 0 { 10 } else { 2 };
+        self.menu.px = ix + 8;
+        self.menu.py = iy + 1;
+        self.cp_draw_string(text);
+        let c = self.tw.fontcolor ^ 8;
+        self.cp_bar(ix + PADBOX_X, iy, PADBOX_W, 8, c);
+        self.cp_bar(ix + PADBOX_X + 1, iy + 1, PADBOX_W - 2, 6, BACKCOLOR);
+        if cursor {
+            self.draw_tile8(ix + PADBOX_X + (PADBOX_W - 8) / 2, iy, CP_KEYCURSORTILE);
+        } else {
+            let name = self.sys.input.pad_map[action].name();
+            let (w, _) = self.cp_measure(name);
+            self.menu.px = ix + PADBOX_X + (PADBOX_W - w) / 2;
+            self.menu.py = iy + 1;
+            self.cp_draw_string(name);
+        }
+        self.tw.fontcolor = 15;
+    }
+
+    /// Waits for the gamepad input of `action` (like USL_CKSetKey): Esc
+    /// cancels, Backspace / Delete clear the binding. An input bound to
+    /// another action of the same kind is refused.
+    fn usl_pad_set_button(&mut self, i: usize, action: usize) {
+        let mut on = false;
+        let mut lasttime = 0;
+        self.sys.input.clear_keys_down();
+        self.sys.input.pad_captured = None;
+        self.sys.input.pad_capture = true;
+        let got = loop {
+            if !self.alive() {
+                break None;
+            }
+            if self.sys.time_count() >= lasttime {
+                on = !on;
+                self.usl_draw_pad_item(i, action, on);
+                self.sys.present();
+                lasttime = self.sys.time_count() + TICKBASE / 2;
+            }
+            if let Some(p) = self.sys.input.pad_captured.take() {
+                break Some(p);
+            }
+            match self.sys.input.last_scan {
+                SC_ESCAPE => break None,
+                SC_BACKSPACE | SC_DELETE => break Some(PadInput::None),
+                _ => self.sys.input.last_scan = 0,
+            }
+            self.cp_wait();
+        };
+        self.sys.input.pad_capture = false;
+        if let Some(p) = got {
+            let map = &self.sys.input.pad_map;
+            if p != PadInput::None && (0..PAD_ACTIONS).any(|k| k != action && map[k] == p) {
+                self.usl_ctl_dialog("Button already used", "Press any key", None);
+            } else {
+                self.sys.input.pad_map[action] = p;
+            }
+        }
+        self.sys.input.clear_keys_down();
+    }
+
     /// --cheatmode card: extra lives and shots, re-entering finished levels.
     fn usl_cheat_custom(&mut self, call: i32, i: Option<usize>) -> bool {
         match call {
@@ -1189,15 +1361,7 @@ impl Game {
                 false
             }
             UIC_TOUCHUPCARD => {
-                // the card has no title picture
-                let s = "CHEAT OPTIONS";
-                let (w, _) = self.cp_measure(s);
-                self.cp_hlin(0x4d, 0xe7, 0x37, 10);
-                self.menu.px = ((0xa0 - w) as u16 >> 1) as i32 + 0x4a;
-                self.menu.py = 0x31;
-                self.tw.fontcolor = 10;
-                self.cp_draw_string(s);
-                self.tw.fontcolor = 15;
+                self.usl_draw_text_title("CHEAT OPTIONS");
                 false
             }
             UIC_DRAW => {
@@ -1758,9 +1922,13 @@ impl Game {
         let m = self.music_mode_num();
         self.usl_push_item(MUSICCARD, m as usize, false);
         // AdLib is always emulated, so its entries stay enabled.
-        // No joystick support: both joystick entries are disabled.
-        self.menu.cards[CONFIGCARD].items[4].flags |= UI_DISABLED;
-        self.menu.cards[CONFIGCARD].items[5].flags |= UI_DISABLED;
+        // No joystick support: both joystick entries are disabled (a
+        // connected gamepad replaces them, see usl_set_pad_entries).
+        for it in self.menu.cards[CONFIGCARD].items.iter_mut() {
+            if it.child == Some(JOY1CARD) || it.child == Some(JOY2CARD) {
+                it.flags |= UI_DISABLED;
+            }
+        }
         if !self.menu.ingame {
             let root = &mut self.menu.cards[ROOTCARD];
             root.items[4].text = "RETURN TO DEMO";
@@ -1777,6 +1945,26 @@ impl Game {
         self.usl_set_options_text();
     }
 
+    /// With a gamepad connected the config card offers "USE GAMEPAD"
+    /// instead of the (unsupported) joystick entries.
+    fn usl_set_pad_entries(&mut self) {
+        let pad = self.sys.input.pad_connected;
+        let c = &mut self.menu.cards[CONFIGCARD];
+        let has_joy2 = c.items.get(5).is_some_and(|it| it.child == Some(JOY2CARD));
+        if pad {
+            c.items[4] = item(UII_FOLDER, 0, 0x22, "USE GAMEPAD", 0, Some(PADCARD));
+            if has_joy2 {
+                c.items.remove(5);
+            }
+        } else {
+            c.items[4] = item(UII_FOLDER, 0, 0x02, "USE JOYSTICK #1", 0, Some(JOY1CARD));
+            if !has_joy2 {
+                c.items.insert(5, item(UII_FOLDER, 0, 0x03, "USE JOYSTICK #2", 0, Some(JOY2CARD)));
+            }
+        }
+        c.cursor = c.cursor.min(c.items.len() - 1);
+    }
+
     /// USL_SetUpCtlPanel (0x2b3c1)
     fn usl_set_up_ctl_panel(&mut self) {
         if self.menu.cards.is_empty() {
@@ -1786,6 +1974,7 @@ impl Game {
             }
         }
         self.usl_check_saved_games();
+        self.usl_set_pad_entries();
         // the control panel uses font 1 (fontnumber = 1)
         self.tw.fontnumber = 1;
         self.tw.fontcolor = 15;
@@ -1878,6 +2067,7 @@ impl Game {
         self.menu.ingame = ingame;
         // widescreen: the panel fills the window (restored below)
         self.set_screen_width(true);
+        self.sys.input.pad_menu_nav = true;
         self.usl_set_up_ctl_panel();
         self.usl_draw_ctl_panel();
         let mut flash = true;
@@ -1953,6 +2143,7 @@ impl Game {
             }
             // the mouse part of the original loop is not supported
         }
+        self.sys.input.pad_menu_nav = false;
         self.usl_tear_down_ctl_panel();
         // back to the view of the caller (the game loop's play field or
         // the original 320 outside of it)
@@ -2129,10 +2320,16 @@ impl Game {
 
     /// SaveTheGame (0x158ec) in our own format.
     fn save_game_file(&mut self, n: usize) -> Result<(), String> {
+        let (path, name) = (self.save_path(n), self.menu.games[n].name.clone());
+        self.save_game_path(&path, &name)
+    }
+
+    /// SaveTheGame to a file.
+    fn save_game_path(&mut self, path: &std::path::Path, name: &str) -> Result<(), String> {
         self.gs.riding = None;
         let mut w = Writer(Vec::new());
         w.0.extend_from_slice(SAVEMAGIC);
-        w.bytes(self.menu.games[n].name.as_bytes());
+        w.bytes(name.as_bytes());
         let gs = self.gs.clone();
         for v in [gs.worldx, gs.worldy] {
             w.i32(v);
@@ -2173,11 +2370,10 @@ impl Game {
         w.i32(self.objectcount);
         w.i32(self.player as i32);
         w.i32(self.scoreobj as i32);
-        let path = self.save_path(n);
         if let Some(d) = path.parent() {
             std::fs::create_dir_all(d).map_err(|e| io_error_text(&e))?;
         }
-        std::fs::write(&path, &w.0).map_err(|e| io_error_text(&e))
+        std::fs::write(path, &w.0).map_err(|e| io_error_text(&e))
     }
 
     fn parse_saved_game(&self, d: &[u8]) -> Result<LoadedGame, String> {
@@ -2251,7 +2447,13 @@ impl Game {
 
     /// LoadTheGame (0x159ea) from our own format.
     fn load_game_file(&mut self, n: usize) -> Result<(), String> {
-        let d = std::fs::read(self.save_path(n)).map_err(|e| io_error_text(&e))?;
+        let path = self.save_path(n);
+        self.load_game_path(&path)
+    }
+
+    /// LoadTheGame from a file.
+    fn load_game_path(&mut self, path: &std::path::Path) -> Result<(), String> {
+        let d = std::fs::read(path).map_err(|e| io_error_text(&e))?;
         let l = self.parse_saved_game(&d)?;
         // Keen 5 keeps the current numfuses (K5 LoadTheGame 0x15db4)
         let numfuses = self.gs.numfuses;
@@ -2346,6 +2548,32 @@ impl Game {
         true
     }
 
+    /// The gamepad save state (not one of the six saved games).
+    fn state_path(&self) -> PathBuf {
+        self.data.dir.join("saves").join(format!("STATE.{}", super::LAYOUT.ext))
+    }
+
+    /// Gamepad SAVE STATE (not in the original).
+    pub fn save_state(&mut self) {
+        let path = self.state_path();
+        let r = self.save_game_path(&path, "GAMEPAD STATE");
+        self.quick_message("State saved", r);
+    }
+
+    /// Gamepad LOAD STATE (not in the original): the last saved state.
+    pub fn load_state(&mut self) {
+        let path = self.state_path();
+        if !path.exists() {
+            self.quick_message("No saved state", Ok(()));
+            return;
+        }
+        let r = self.load_game_path(&path);
+        if r.is_ok() {
+            self.rf_refresh();
+        }
+        self.quick_message("State loaded", r);
+    }
+
     /// Short in-game box after a quick save/load; errors wait for a key.
     fn quick_message(&mut self, msg: &str, r: Result<(), String>) {
         match r {
@@ -2432,7 +2660,13 @@ impl Game {
                 "down" => d.down = sc.unwrap_or(d.down),
                 "downright" => d.downright = sc.unwrap_or(d.downright),
                 "firescan" => self.firescan = sc.unwrap_or(self.firescan),
-                _ => {}
+                _ => {
+                    if let Some(a) = PAD_ACTION_KEYS.iter().position(|&n| n == k) {
+                        if let Some(p) = PadInput::parse(v) {
+                            self.sys.input.pad_map[a] = p;
+                        }
+                    }
+                }
             }
         }
         if scores.len() == super::demo::MAXSCORES {
@@ -2473,6 +2707,9 @@ impl Game {
         );
         if super::EPISODE == 5 {
             text += &format!("jerk={}\n", b(self.menu.jerk));
+        }
+        for (k, p) in PAD_ACTION_KEYS.iter().zip(self.sys.input.pad_map) {
+            text += &format!("{}={}\n", k, p.encode());
         }
         for h in &self.demo.scores {
             text += &format!("highscore={},{},{}\n", h.score, h.completed, String::from_utf8_lossy(&h.name));

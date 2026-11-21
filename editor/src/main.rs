@@ -121,7 +121,7 @@ pub struct App {
     pub recenter: bool,
     /// difficulty for play tests (1 easy, 2 normal, 3 hard), remembered
     pub difficulty: i32,
-    /// testing: KEEN6_EDITOR_SHOT=file.png saves a screenshot and exits
+    /// testing: KEEN_EDITOR_SHOT=file.png saves a screenshot and exits
     shot: Option<(PathBuf, u32)>,
 }
 
@@ -168,10 +168,10 @@ impl App {
                 .and_then(|v| v.parse().ok())
                 .filter(|d| (1..=3).contains(d))
                 .unwrap_or(2),
-            shot: std::env::var_os("KEEN6_EDITOR_SHOT").map(|p| (PathBuf::from(p), 0)),
+            shot: std::env::var_os("KEEN_EDITOR_SHOT").map(|p| (PathBuf::from(p), 0)),
         };
         app.select_map(map.min(NUMMAPS - 1));
-        if let Ok(setup) = std::env::var("KEEN6_EDITOR_SETUP") {
+        if let Ok(setup) = std::env::var("KEEN_EDITOR_SETUP") {
             app.debug_setup(&setup);
         }
         app

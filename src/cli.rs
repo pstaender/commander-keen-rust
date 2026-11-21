@@ -108,7 +108,7 @@ pub fn main(default_dir: &str) {
             std::process::exit(1);
         }
     };
-    if let Ok(spec) = std::env::var("KEEN6_RENDER_WAV") {
+    if let Ok(spec) = std::env::var("KEEN_RENDER_WAV") {
         // "song:N:file.wav" or "pc:N:file.wav" / "adlib:N:file.wav"
         let p: Vec<&str> = spec.split(':').collect();
         let n: usize = p.get(1).and_then(|v| v.parse().ok()).unwrap_or(0);

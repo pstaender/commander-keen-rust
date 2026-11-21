@@ -150,7 +150,7 @@ mod tests {
     use super::*;
 
     /// Builds a small test level in a new slot and saves it; with
-    /// KEEN6_EDITOR_TEST_OUT=dir the map set is kept there for the game.
+    /// KEEN_EDITOR_TEST_OUT=dir the map set is kept there for the game.
     #[test]
     fn new_small_level() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../KEEN6");
@@ -171,14 +171,14 @@ mod tests {
         }
         m.planes[2][(h - 4) * w + 4] = 1;
         p.maps[19] = Some(m);
-        let out = std::env::var("KEEN6_EDITOR_TEST_OUT")
+        let out = std::env::var("KEEN_EDITOR_TEST_OUT")
             .map(PathBuf::from)
             .unwrap_or_else(|_| std::env::temp_dir().join(format!("keen-editor-unit-{}", std::process::id())));
         p.save_to(&out).unwrap();
         let back = Project::open(&dir, Some(&out)).unwrap();
         assert_eq!(back.maps[19].as_ref().unwrap().planes, p.maps[19].as_ref().unwrap().planes);
         assert_eq!(back.maps[3].as_ref().unwrap().planes, p.maps[3].as_ref().unwrap().planes);
-        if std::env::var("KEEN6_EDITOR_TEST_OUT").is_err() {
+        if std::env::var("KEEN_EDITOR_TEST_OUT").is_err() {
             std::fs::remove_dir_all(&out).ok();
         }
     }

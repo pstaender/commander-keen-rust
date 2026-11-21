@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare a DOSBox trace (dosbox_trace.py) with KEEN6_TRACE files of the
+"""Compare a DOSBox trace (dosbox_trace.py) with KEEN_TRACE files of the
 Rust port: every sampled (x, y, shapenum) of the original during a demo
 must appear, in order, in the port's per-frame trace of that map.
 

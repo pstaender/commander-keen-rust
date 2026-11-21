@@ -705,6 +705,18 @@ impl Game {
                 self.lasttimecount = self.sys.time_count();
             }
         }
+        // gamepad SAVE STATE / LOAD STATE (not in the original)
+        let (save, load) = (std::mem::take(&mut self.sys.input.pad_save), std::mem::take(&mut self.sys.input.pad_load));
+        if !self.storedemo && self.demomode == 0 && (save || load) {
+            if save {
+                self.save_state();
+            } else {
+                self.load_state();
+            }
+            self.rf_force_refresh();
+            self.sys.input.clear_keys_down();
+            self.lasttimecount = self.sys.time_count();
+        }
         if !self.storedemo {
             let ls = self.sys.input.last_scan;
             // Keen 6 opens the control panel with F1 too
@@ -949,7 +961,7 @@ impl Game {
     }
 }
 
-/// Debug aid: with `KEEN6_TRACE=file`, every refresh appends
+/// Debug aid: with `KEEN_TRACE=file`, every refresh appends
 /// `mapon x y shapenum` of the player, for comparison against a trace of
 /// the original read from DOSBox memory (`tools/dosbox_trace.py`).
 static TRACE: std::sync::OnceLock<Option<std::sync::Mutex<std::fs::File>>> =
@@ -958,7 +970,7 @@ static TRACE: std::sync::OnceLock<Option<std::sync::Mutex<std::fs::File>>> =
 impl Game {
     fn trace_frame(&self) {
         let t = TRACE.get_or_init(|| {
-            let path = std::env::var_os("KEEN6_TRACE")?;
+            let path = std::env::var_os("KEEN_TRACE")?;
             std::fs::File::create(path).ok().map(std::sync::Mutex::new)
         });
         if let Some(f) = t {
