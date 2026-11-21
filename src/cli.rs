@@ -46,6 +46,8 @@ const USAGE: &str = "keenN [options]
                      (extra lives and shots, re-enter finished levels);
                      F2/F3 quick save/load the slot last saved or loaded
   --dump DIR         export the original graphics as PNG files and exit
+  --export-sfx DIR   write the original sound effects as DIR/NN-adlib.wav
+                     and DIR/NN-pc.wav and exit
   --headless         run without a window (testing)";
 
 /// `main` of the executables: `default_dir` is the data directory used
@@ -55,6 +57,7 @@ pub fn main(default_dir: &str) {
     let mut data_dir = PathBuf::from(default_dir);
     let mut dump_dir: Option<PathBuf> = None;
     let mut midi_dir: Option<PathBuf> = None;
+    let mut sfx_dir: Option<PathBuf> = None;
     let mut midi_music = false;
     let mut gfx_pack: Option<PathBuf> = None;
     let mut audio_pack: Option<PathBuf> = None;
@@ -80,6 +83,7 @@ pub fn main(default_dir: &str) {
             "--soundfont" => soundfont = Some(PathBuf::from(next(&mut i))),
             "--midi-music" => midi_music = true,
             "--export-midi" => midi_dir = Some(PathBuf::from(next(&mut i))),
+            "--export-sfx" => sfx_dir = Some(PathBuf::from(next(&mut i))),
             "--window-scale" => window_scale = next(&mut i).parse().unwrap_or(3),
             "--no-aspect" => aspect = false,
             "--nosound" => sound = false,
@@ -152,6 +156,11 @@ pub fn main(default_dir: &str) {
             _ => crate::engine::sound::render_to_wav(&data.audio, None, Some((n, crate::engine::sound::SdMode::AdLib)), 2.0, path),
         };
         r.expect("render failed");
+        return;
+    }
+    if let Some(d) = sfx_dir {
+        let n = crate::engine::sound::export_sfx(&data.audio, &d).expect("sound export failed");
+        println!("exported {} sound effects to {}", n, d.display());
         return;
     }
     if let Some(d) = midi_dir {

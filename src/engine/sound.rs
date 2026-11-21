@@ -720,6 +720,59 @@ pub fn render_midi_to_wav(audio: &Audio, n: usize, soundfont: &Path, table: &cra
     write_wav(&buf, path)
 }
 
+/// `--export-sfx DIR`: every sound effect as DIR/NN-adlib.wav and
+/// DIR/NN-pc.wav, rendered like in the game and cut after the sound (and
+/// the AdLib release) has died away, plus DIR/sfx.json with the raw data
+/// (AdLib: block, instrument registers and one F-number byte per 140 Hz
+/// tick, 0 = key off; PC speaker: one PIT divisor/60 byte per tick).
+pub fn export_sfx(audio: &Audio, dir: &Path) -> std::io::Result<usize> {
+    std::fs::create_dir_all(dir)?;
+    let mut json = String::from("[\n");
+    for n in 0..audio.adlib.len().max(audio.pc.len()) {
+        let list = |d: &[u8]| d.iter().map(|b| b.to_string()).collect::<Vec<_>>().join(",");
+        let (al, pc) = (audio.adlib.get(n), audio.pc.get(n));
+        let inst = al.map(|s| {
+            let i = &s.inst;
+            [i.m_char, i.c_char, i.m_scale, i.c_scale, i.m_attack, i.c_attack, i.m_sus, i.c_sus, i.m_wave, i.c_wave, i.n_conn]
+        });
+        json.push_str(&format!(
+            "{{\"n\":{},\"priority\":{},\"block\":{},\"inst\":[{}],\"adlib\":[{}],\"pc\":[{}]}}{}\n",
+            n,
+            al.map(|s| s.priority).unwrap_or(0),
+            al.map(|s| s.block).unwrap_or(0),
+            inst.map(|i| list(&i)).unwrap_or_default(),
+            al.map(|s| list(&s.data)).unwrap_or_default(),
+            pc.map(|s| list(&s.data)).unwrap_or_default(),
+            if n + 1 < audio.adlib.len().max(audio.pc.len()) { "," } else { "" }
+        ));
+    }
+    json.push_str("]\n");
+    std::fs::write(dir.join("sfx.json"), json)?;
+    let mut count = 0;
+    for n in 0..audio.adlib.len().max(audio.pc.len()) {
+        for (mode, tag, len) in [
+            (SdMode::AdLib, "adlib", audio.adlib.get(n).map(|s| s.data.len())),
+            (SdMode::PC, "pc", audio.pc.get(n).map(|s| s.data.len())),
+        ] {
+            let Some(len) = len.filter(|&l| l > 0) else { continue };
+            let mut s = Synth::new(audio);
+            s.sound_mode = mode;
+            if !s.play(n) {
+                continue;
+            }
+            // the sound itself (140 Hz ticks) plus up to 2 s of release
+            let total = ((len as f32 / 140.0 + 2.0) * SAMPLE_RATE as f32) as usize;
+            let mut buf = vec![0f32; total];
+            s.render(&mut buf);
+            let end = buf.iter().rposition(|v| v.abs() > 0.002).map(|i| i + 1).unwrap_or(0);
+            let keep = (end + SAMPLE_RATE as usize / 50).min(buf.len());
+            write_wav(&buf[..keep], &dir.join(format!("{:02}-{}.wav", n, tag)))?;
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
 fn write_wav(buf: &[f32], path: &Path) -> std::io::Result<()> {
     let total = buf.len();
     let mut data = Vec::with_capacity(total * 2);

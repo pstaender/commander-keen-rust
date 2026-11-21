@@ -88,6 +88,7 @@ case-insensitively.
 | `--debug-shortcuts` | enable the F10 debug keys (alias `--debug`) |
 | `--cheatmode` | CHEAT OPTIONS replaces END GAME in the main menu: add lives and shots, allow re-entering finished levels |
 | `--dump DIR` | export all original graphics as PNG files and exit |
+| `--export-sfx DIR` | export all original sound effects as `DIR/NN-adlib.wav` and `DIR/NN-pc.wav` and exit (e.g. to compare with an audio pack) |
 | `--headless` | run without a window (automated testing) |
 
 ### Controls
