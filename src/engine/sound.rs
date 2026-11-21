@@ -562,7 +562,7 @@ impl SoundManager {
         if let Some(s) = &self.music_sink {
             s.clear();
         }
-        self.current_song = None;
+        // current_song is kept: music_on (after PAUSED) restarts it
         self.with(|s| {
             s.music_on = false;
             s.music = None;
