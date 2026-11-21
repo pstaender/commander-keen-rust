@@ -22,4 +22,8 @@ pub struct Options {
     pub allow_reenter: bool,
     /// --no-auto-save: no AUTOSAVE.CKn while playing / resume at start
     pub no_auto_save: bool,
+    /// --classic: the game as it was; implies classic_view and
+    /// no_auto_save, no quick save (gamepad save/load state, the load menu's
+    /// second page, --cheatmode F2/F3) and no --midi-music
+    pub classic: bool,
 }

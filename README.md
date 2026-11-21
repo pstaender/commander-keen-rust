@@ -76,6 +76,7 @@ case-insensitively.
 | `--window-scale N` | window size multiplier (default 3) |
 | `--fullscreen` / `--windowed` | start fullscreen or in a window (otherwise the last used mode from `config.txt`) |
 | `--no-aspect` | don't stretch 320×200 to 4:3 |
+| `--classic` | the game as it was: no widescreen (play field, intro, menu), no `--midi-music`, no autosave and no quick save (gamepad save/load state, load menu page 2, `--cheatmode` F2/F3) |
 | `--classic-view` | keep the original 320×200 play field instead of widening it to the screen |
 | `--no-auto-save` | turn off the autosave (every 5 s to `saves/AUTOSAVE.CKn`; after a crash, kill or quit the game offers to resume it at the next start) |
 | `--system-shortcuts` | macOS: keep the system keyboard shortcuts active while the game has focus (see below) |

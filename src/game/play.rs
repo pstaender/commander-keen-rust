@@ -697,7 +697,7 @@ impl Game {
         // --cheatmode: F2 quick saves, F3 quick loads the last used slot
         // (only once a game was loaded or saved, otherwise the panel opens)
         let ls = self.sys.input.last_scan;
-        if self.opts.cheatmode && !self.storedemo && (ls == SC_F2 || ls == SC_F3) {
+        if self.opts.cheatmode && !self.opts.classic && !self.storedemo && (ls == SC_F2 || ls == SC_F3) {
             let done = if ls == SC_F2 { self.quick_save() } else { self.quick_load() };
             if done {
                 self.rf_force_refresh();
@@ -708,7 +708,7 @@ impl Game {
         self.autosave_tick();
         // gamepad SAVE STATE / LOAD STATE (not in the original)
         let (save, load) = (std::mem::take(&mut self.sys.input.pad_save), std::mem::take(&mut self.sys.input.pad_load));
-        if !self.storedemo && self.demomode == 0 && (save || load) {
+        if !self.opts.classic && !self.storedemo && self.demomode == 0 && (save || load) {
             if save {
                 self.save_state();
             } else {

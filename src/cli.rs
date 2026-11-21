@@ -24,6 +24,9 @@ const USAGE: &str = "keenN [options]
   --fullscreen       start in fullscreen mode (F11 or Cmd/Win+F toggles)
   --windowed         start in a window
   --no-aspect        do not stretch to 4:3
+  --classic          the game as it was: no widescreen, no MIDI music, no
+                     autosave and no quick save (gamepad save/load state,
+                     load menu page 2, --cheatmode F2/F3)
   --classic-view     keep the original 320x200 play field (otherwise it
                      widens to the window's shape, e.g. 16:9)
   --system-shortcuts keep the macOS keyboard shortcuts (Ctrl+arrows switch
@@ -86,6 +89,7 @@ pub fn main(default_dir: &str) {
             "--fullscreen" => opts.fullscreen = Some(true),
             "--windowed" => opts.fullscreen = Some(false),
             "--classic-view" => opts.classic_view = true,
+            "--classic" => opts.classic = true,
             "--cheatmode" => opts.cheatmode = true,
             "--no-auto-save" => opts.no_auto_save = true,
             "--difficulty" => {
@@ -115,6 +119,14 @@ pub fn main(default_dir: &str) {
             other => eprintln!("unknown option {}", other),
         }
         i += 1;
+    }
+    if opts.classic {
+        opts.classic_view = true;
+        opts.no_auto_save = true;
+        if midi_music {
+            eprintln!("--classic: ignoring --midi-music");
+            midi_music = false;
+        }
     }
     let data = match GameData::load_with_maps(&data_dir, maps_dir.as_deref()) {
         Ok(d) => d,

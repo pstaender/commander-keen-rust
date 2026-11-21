@@ -84,6 +84,10 @@ runtime and are never committed.
   intro (Terminator, `ega_render_wide` paints beyond the 320 EGA view) and
   the control panel (`Surface::extend_edges` continues the arm) go wide
   (`Game::set_screen_width`); title, story etc. stay 320.
+- `--classic` (`Options::classic`) switches the additions off: it implies
+  `classic_view` and `no_auto_save`, ignores `--midi-music` and disables
+  quick save (gamepad save/load state, load menu page 2, cheat F2/F3).
+  New non-original features should respect it.
 - Original globals live in `Game` (src/game/mod.rs); module-private globals
   go in the module's `ModState`.
 - Don't commit game data or anything derived from the executable's code.

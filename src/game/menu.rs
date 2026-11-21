@@ -1902,7 +1902,7 @@ impl Game {
         let top = self.cp_top();
         let cur = self.menu.cards[top].cursor;
         // load card: down from the last entry turns the page
-        if top == LOADCARD && cur + 1 >= self.cp_nitems(top) {
+        if top == LOADCARD && !self.opts.classic && cur + 1 >= self.cp_nitems(top) {
             self.usl_load_set_page(1 - self.menu.load_page, 0);
             return;
         }
@@ -1916,7 +1916,7 @@ impl Game {
         let top = self.cp_top();
         let cur = self.menu.cards[top].cursor;
         // load card: up from the first entry turns the page
-        if top == LOADCARD && cur == 0 {
+        if top == LOADCARD && !self.opts.classic && cur == 0 {
             let page = 1 - self.menu.load_page;
             let last = if page == 0 { MAXSAVEGAMES } else { LOAD_EXTRA.len() } - 1;
             self.usl_load_set_page(page, last);
@@ -2058,6 +2058,10 @@ impl Game {
             self.menu.cards = build_cards();
             if self.opts.cheatmode {
                 self.menu.cards[ROOTCARD].items[5] = item(UII_FOLDER, 0, 0x23, "CHEAT OPTIONS", 0, Some(CHEATCARD));
+            }
+            if self.opts.classic {
+                // --classic: no save / load state buttons
+                self.menu.cards[PADBUTTONSCARD].items.truncate(4);
             }
         }
         self.usl_check_saved_games();
@@ -2202,7 +2206,7 @@ impl Game {
                         resetitem = true;
                     }
                     // load card: left / right switch the page
-                    SC_LEFTARROW | SC_RIGHTARROW if self.cp_top() == LOADCARD => {
+                    SC_LEFTARROW | SC_RIGHTARROW if self.cp_top() == LOADCARD && !self.opts.classic => {
                         let p = (ls == SC_RIGHTARROW) as usize;
                         if p != self.menu.load_page {
                             self.usl_load_set_page(p, 0);
