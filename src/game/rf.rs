@@ -78,8 +78,11 @@ pub struct SpriteSlot {
     pub y: i32,
     pub shape: i32,
     pub priority: i32,
-    /// order of placement (later placed = drawn later within a priority)
-    pub order: u32,
+    /// drawing order within a priority (smaller first): like the linked
+    /// priority lists of ID_RF, a sprite gets its place when it is created
+    /// or changes priority, at the head of the list (drawn first, below
+    /// the older sprites), and keeps it while it moves or animates
+    pub order: i64,
     /// RF maskdraw: draw the sprite's shape in white
     pub white: bool,
 }
@@ -109,7 +112,8 @@ pub struct RfState {
     pub fg_group: Vec<i32>,
     pub sprites: Vec<SpriteSlot>,
     pub stars: Vec<SpriteSlot>,
-    pub order: u32,
+    /// counter for new sprite places (see `SpriteSlot::order`)
+    pub order: i64,
     /// status window refresh hook active (StatusWindow scrolling)
     pub hook: Option<fn(&mut Game)>,
     /// drawn after the tiles, before the sprites (master screen drawing)
@@ -517,15 +521,25 @@ impl Game {
             self.objs[ob].sprite = false;
             return;
         }
-        self.rf.order += 1;
-        let order = self.rf.order;
+        let old = self.rf.sprites[ob];
+        let order = if self.objs[ob].sprite && old.visible && old.priority == priority {
+            old.order
+        } else {
+            self.rf.order += 1;
+            -self.rf.order
+        };
         self.rf.sprites[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false };
         self.objs[ob].sprite = true;
     }
 
     pub fn place_stars(&mut self, ob: usize, x: i32, y: i32, shape: i32, priority: i32) {
-        self.rf.order += 1;
-        let order = self.rf.order;
+        let old = self.rf.stars[ob];
+        let order = if old.visible && old.priority == priority {
+            old.order
+        } else {
+            self.rf.order += 1;
+            -self.rf.order
+        };
         self.rf.stars[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false };
     }
 
