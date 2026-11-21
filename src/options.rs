@@ -24,6 +24,6 @@ pub struct Options {
     pub no_auto_save: bool,
     /// --classic: the game as it was; implies classic_view and
     /// no_auto_save, no quick save (gamepad save/load state, the load menu's
-    /// second page, --cheatmode F2/F3) and no --midi-music
+    /// second page, --cheatmode F2/F3), no MIDI music and no volume bars
     pub classic: bool,
 }

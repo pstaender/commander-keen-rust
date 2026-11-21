@@ -70,13 +70,12 @@ case-insensitively.
 | `--data DIR` | directory with the original game files (default `KEEN4`, `KEEN5` or `KEEN6`, after the executable's name) |
 | `--gfx-pack DIR` | high-resolution graphics replacement pack (see below) |
 | `--audio-pack DIR` | replacement sound effects and music (see below) |
-| `--soundfont FILE` | SoundFont (`.sf2`) for `--midi-music` and `.mid` replacement music |
-| `--midi-music` | play the music as General MIDI converted from the original AdLib songs (see below) |
+| `--soundfont FILE` | SoundFont (`.sf2`) for the MIDI music and `.mid` replacement music (default: the first `.sf2` found, see below) |
 | `--export-midi DIR` | write all songs as `DIR/music/NN.mid` plus `DIR/instruments.txt` and exit |
 | `--window-scale N` | window size multiplier (default 3) |
 | `--fullscreen` / `--windowed` | start fullscreen or in a window (otherwise the last used mode from `config.txt`) |
 | `--no-aspect` | don't stretch 320×200 to 4:3 |
-| `--classic` | the game as it was: no widescreen (play field, intro, menu), no `--midi-music`, no autosave and no quick save (gamepad save/load state, load menu page 2, `--cheatmode` F2/F3) |
+| `--classic` | the game as it was: no widescreen (play field, intro, menu), no MIDI music, no volume settings, no autosave and no quick save (gamepad save/load state, load menu page 2, `--cheatmode` F2/F3) |
 | `--classic-view` | keep the original 320×200 play field instead of widening it to the screen |
 | `--no-auto-save` | turn off the autosave (every 5 s to `saves/AUTOSAVE.CKn`; after a crash, kill or quit the game offers to resume it at the next start) |
 | `--system-shortcuts` | macOS: keep the system keyboard shortcuts active while the game has focus (see below) |
@@ -261,11 +260,18 @@ Missing files fall back to the original graphics. The game logic still runs at
 
 Anything not replaced plays through the emulated AdLib/PC speaker.
 
-### MIDI music: `--midi-music`
+### MIDI music and volumes
 
-The original songs are AdLib register streams. `--midi-music` converts them
-to General MIDI when the game loads and plays them through a SoundFont. Timing
-and loop points match the original exactly.
+In the control panel, CONFIGURE > MUSIC offers **MIDI MUSIC** after
+ADLIB/SOUNDBLASTER. The original songs are AdLib register streams; MIDI
+MUSIC converts them to General MIDI and plays them through a SoundFont.
+Timing and loop points match the original exactly. The entry is disabled
+when no SoundFont is found.
+
+CONFIGURE > SOUND and CONFIGURE > MUSIC each have a **VOLUME** bar (default
+100 %): select it and press left / right to change it in 10 % steps. The
+choice and both volumes are saved in `config.txt`. With `--classic` the
+cards are the original ones (no MIDI, no volume bars).
 
 - **SoundFont.** Pass it with `--soundfont FILE.sf2`. Without that option the
   first `.sf2` in the data directory, next to the executable or in the
@@ -304,7 +310,7 @@ Environment variables (mostly for use with `--headless`):
 | `KEEN_KEYS="frame:scancode[+frames],..."` | scripted key presses |
 | `KEEN_PAD_DEBUG=1` | print the detected gamepads (name, mapping) and all their events |
 | `KEEN_TRACE=file` | log the player's map/x/y/sprite per game frame |
-| `KEEN_RENDER_WAV="song:N:file.wav"` | render music (or `midi:N:…` for the `--midi-music` version, `pc:N:…`, `adlib:N:…` for sounds) to WAV and exit |
+| `KEEN_RENDER_WAV="song:N:file.wav"` | render music (or `midi:N:…` for the MIDI version, `pc:N:…`, `adlib:N:…` for sounds) to WAV and exit |
 
 `tools/dosbox_trace.py` (`EP=4|5|6`) and `tools/compare_trace.py` record the
 same trace from the original game running in DOSBox Staging

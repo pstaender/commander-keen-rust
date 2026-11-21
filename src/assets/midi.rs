@@ -1,5 +1,5 @@
 //! IMF (AdLib register stream) to General MIDI conversion, used by
-//! `--midi-music` (played through a SoundFont) and `--export-midi`.
+//! the MIDI MUSIC mode (played through a SoundFont) and `--export-midi`.
 //!
 //! The song is replayed against a model of the OPL2 registers: a key-on
 //! becomes a note-on with the pitch of the channel's F-number/block, a

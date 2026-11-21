@@ -112,6 +112,11 @@ const CHEATCARD: usize = 19;
 const PADCARD: usize = 20;
 const PADMOVECARD: usize = 21;
 const PADBUTTONSCARD: usize = 22;
+/// the VOLUME entries of SOUNDCARD and MUSICCARD (not in the original)
+const SOUND_VOLUME_ITEM: usize = 4;
+const MUSIC_VOLUME_ITEM: usize = 3;
+/// the MIDI MUSIC entry of MUSICCARD
+const MUSIC_MIDI_ITEM: usize = 2;
 /// the gamepad actions of the PADMOVECARD and PADBUTTONSCARD entries
 const PADMOVE_ACTIONS: [usize; 4] = [PAD_UP, PAD_DOWN, PAD_LEFT, PAD_RIGHT];
 const PADBUTTON_ACTIONS: [usize; 6] = [PAD_JUMP, PAD_POGO, PAD_FIRE, PAD_MENU, PAD_SAVESTATE, PAD_LOADSTATE];
@@ -164,6 +169,9 @@ enum Custom {
     Pad,
     /// gamepad binding cards (not in the original)
     PadSet,
+    /// sound / music cards: volume bar, MIDI entry (not in the original)
+    Sound,
+    Music,
 }
 
 #[derive(Clone)]
@@ -267,12 +275,27 @@ fn build_cards() -> Vec<Card> {
                 r(0x19, "PC SPEAKER"),
                 r(0x1e, "ADLIB/SOUNDBLASTER"),
                 r(0x10, "QUIET ADLIB/SOUNDBLASTER"),
+                // not in the original (removed with --classic)
+                item(UII_BUTTON, UI_SEPARATED, 0x2f, "VOLUME", 0, None),
             ],
-            Custom::None,
+            Custom::Sound,
             0,
         ),
         // MUSICCARD 2e2e
-        card(8, 0, 0x11, vec![r(0x31, "NO MUSIC"), r(0x1e, "ADLIB/SOUNDBLASTER")], Custom::None, 0),
+        card(
+            8,
+            0,
+            0x11,
+            vec![
+                r(0x31, "NO MUSIC"),
+                r(0x1e, "ADLIB/SOUNDBLASTER"),
+                // not in the original (removed with --classic)
+                r(0x32, "MIDI MUSIC"),
+                item(UII_BUTTON, UI_SEPARATED, 0x2f, "VOLUME", 0, None),
+            ],
+            Custom::Music,
+            0,
+        ),
         // OPTIONSCARD 2e4e (Keen 5: score box, two-button, jerky motion,
         // compatibility)
         card(
@@ -411,6 +434,10 @@ pub struct ModState {
     pub controltype: i32,
     creature_ok: bool,
     creature_num: i32,
+    /// volumes in percent as set in the menu / config (not in the
+    /// original; not applied with --classic)
+    pub sfx_volume: u8,
+    pub music_volume: u8,
 }
 
 impl Default for ModState {
@@ -435,6 +462,8 @@ impl Default for ModState {
             controltype: 0,
             creature_ok: false,
             creature_num: -1,
+            sfx_volume: 100,
+            music_volume: 100,
         }
     }
 }
@@ -734,6 +763,7 @@ impl Game {
         match self.sd.music_mode {
             SmMode::Off => 0,
             SmMode::AdLib => 1,
+            SmMode::Midi => 2,
         }
     }
 
@@ -1043,6 +1073,8 @@ impl Game {
             Custom::Cheat => self.usl_cheat_custom(call, i),
             Custom::Pad => self.usl_pad_custom(call, i),
             Custom::PadSet => self.usl_pad_set_custom(call, i),
+            Custom::Sound => self.usl_volume_custom(call, i, SOUND_VOLUME_ITEM),
+            Custom::Music => self.usl_volume_custom(call, i, MUSIC_VOLUME_ITEM),
         }
     }
 
@@ -1367,6 +1399,80 @@ impl Game {
     }
 
     /// --cheatmode card: extra lives and shots, re-entering finished levels.
+    /// Sets the menu volumes on the sound manager (not with --classic).
+    pub fn apply_volumes(&mut self) {
+        let (s, m) = if self.opts.classic { (100, 100) } else { (self.menu.sfx_volume, self.menu.music_volume) };
+        self.sd.set_sfx_volume(s);
+        self.sd.set_music_volume(m);
+    }
+
+    /// The selected entry is a volume bar: Some(true) = music.
+    fn usl_volume_item(&self) -> Option<bool> {
+        let top = self.cp_top();
+        let cur = self.menu.cards[top].cursor;
+        let n = self.menu.cards[top].items.len();
+        match top {
+            SOUNDCARD if cur == SOUND_VOLUME_ITEM && cur < n => Some(false),
+            MUSICCARD if cur == MUSIC_VOLUME_ITEM && cur < n => Some(true),
+            _ => None,
+        }
+    }
+
+    /// Left / right on a volume bar: 10 % steps.
+    fn usl_change_volume(&mut self, delta: i32) {
+        let Some(music) = self.usl_volume_item() else { return };
+        let v = if music { &mut self.menu.music_volume } else { &mut self.menu.sfx_volume };
+        *v = (*v as i32 + delta).clamp(0, 100) as u8;
+        self.apply_volumes();
+        let cur = self.menu.cards[self.cp_top()].cursor;
+        self.usl_draw_item(cur);
+        if !music {
+            // let the player hear the new loudness
+            self.play_sound(super::keen::SND_GETPOINTS);
+        }
+    }
+
+    /// Sound and music cards (not in the original): the VOLUME bar and the
+    /// MIDI MUSIC entry (disabled without a SoundFont).
+    fn usl_volume_custom(&mut self, call: i32, i: Option<usize>, vol_item: usize) -> bool {
+        match call {
+            UIC_SETUPCARD => {
+                let avail = self.sd.midi_available();
+                if let Some(it) = self.menu.cards[MUSICCARD].items.get_mut(MUSIC_MIDI_ITEM) {
+                    if avail {
+                        it.flags &= !UI_DISABLED;
+                    } else {
+                        it.flags |= UI_DISABLED;
+                    }
+                }
+                false
+            }
+            UIC_DRAW if i == Some(vol_item) => {
+                let i = vol_item;
+                let v = if vol_item == MUSIC_VOLUME_ITEM { self.menu.music_volume } else { self.menu.sfx_volume };
+                self.usl_draw_item_text(i, "VOLUME");
+                let it = self.cp_item(self.cp_top(), i);
+                let (fl, y) = (it.flags, it.y);
+                let color = if fl & UI_SELECTED != 0 { 2 } else { 10 };
+                // 10 blocks, 6 pixels each, then the percentage
+                let x0 = 0x8c;
+                for k in 0..10 {
+                    let on = (v as i32) > k * 10;
+                    self.cp_bar(x0 + k * 6, y + 1, 5, 6, if on { color } else { 0 });
+                }
+                let text = format!("{}%", v);
+                self.tw.fontcolor = color;
+                self.menu.px = x0 + 64;
+                self.menu.py = y + 1;
+                self.cp_draw_string(&text);
+                self.tw.fontcolor = 15;
+                true
+            }
+            UIC_HIT if i == Some(vol_item) => true,
+            _ => false,
+        }
+    }
+
     fn usl_cheat_custom(&mut self, call: i32, i: Option<usize>) -> bool {
         match call {
             UIC_SETUPCARD => {
@@ -2060,8 +2166,11 @@ impl Game {
                 self.menu.cards[ROOTCARD].items[5] = item(UII_FOLDER, 0, 0x23, "CHEAT OPTIONS", 0, Some(CHEATCARD));
             }
             if self.opts.classic {
-                // --classic: no save / load state buttons
+                // --classic: no save / load state buttons, no volume
+                // bars, no MIDI music
                 self.menu.cards[PADBUTTONSCARD].items.truncate(4);
+                self.menu.cards[SOUNDCARD].items.truncate(SOUND_VOLUME_ITEM);
+                self.menu.cards[MUSICCARD].items.truncate(MUSIC_MIDI_ITEM);
             }
         }
         self.usl_check_saved_games();
@@ -2099,7 +2208,11 @@ impl Game {
         }
         let m = self.usl_find_pushed_item(MUSICCARD);
         if m >= 0 && m != self.music_mode_num() {
-            self.sd.set_music_mode(if m == 0 { SmMode::Off } else { SmMode::AdLib });
+            self.sd.set_music_mode(match m {
+                0 => SmMode::Off,
+                2 => SmMode::Midi,
+                _ => SmMode::AdLib,
+            });
         }
     }
 
@@ -2203,6 +2316,11 @@ impl Game {
                     }
                     SC_RETURN => {
                         self.usl_do_item();
+                        resetitem = true;
+                    }
+                    // volume bars: left / right change the volume
+                    SC_LEFTARROW | SC_RIGHTARROW if self.usl_volume_item().is_some() => {
+                        self.usl_change_volume(if ls == SC_RIGHTARROW { 10 } else { -10 });
                         resetitem = true;
                     }
                     // load card: left / right switch the page
@@ -2834,8 +2952,11 @@ impl Game {
                 "music" => match n {
                     0 => self.sd.set_music_mode(SmMode::Off),
                     1 => self.sd.set_music_mode(SmMode::AdLib),
+                    2 => self.sd.set_music_mode(SmMode::Midi),
                     _ => {}
                 },
+                "soundvolume" if (0..=100).contains(&n) => self.menu.sfx_volume = n as u8,
+                "musicvolume" if (0..=100).contains(&n) => self.menu.music_volume = n as u8,
                 "quietadlib" => quiet = n == 1,
                 "showscorebox" => self.showscorebox = n == 1,
                 "fullscreen" => {
@@ -2871,6 +2992,7 @@ impl Game {
             self.demo.scores = scores;
         }
         self.sd.set_quiet(quiet);
+        self.apply_volumes();
     }
 
     /// USL_WriteConfig (0x282af), as a text file `config.txt`.
@@ -2881,10 +3003,11 @@ impl Game {
             "# Commander Keen {} configuration\n\
              sound={}\nmusic={}\nquietadlib={}\nshowscorebox={}\ncompatibility={}\ntwobutton={}\ncontroltype={}\n\
              button0={}\nbutton1={}\nupleft={}\nup={}\nupright={}\nleft={}\nright={}\ndownleft={}\ndown={}\ndownright={}\n\
-             firescan={}\nfullscreen={}\n",
+             firescan={}\nfullscreen={}\nsoundvolume={}\nmusicvolume={}\n",
             super::EPISODE,
             self.sound_mode_num(),
-            self.music_mode_num(),
+            // with --classic MIDI falls back to AdLib but stays chosen
+            if self.sd.midi_requested { 2 } else { self.music_mode_num() },
             b(self.sd.quiet_adlib),
             b(self.showscorebox),
             b(self.menu.compatibility),
@@ -2901,7 +3024,9 @@ impl Game {
             d.down,
             d.downright,
             self.firescan,
-            b(self.sys.fullscreen())
+            b(self.sys.fullscreen()),
+            self.menu.sfx_volume,
+            self.menu.music_volume
         );
         if super::EPISODE == 5 {
             text += &format!("jerk={}\n", b(self.menu.jerk));

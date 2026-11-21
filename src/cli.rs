@@ -12,12 +12,10 @@ const USAGE: &str = "keenN [options]
                      episode is detected from the files; default: KEENN)
   --gfx-pack DIR     high resolution graphics replacement pack
   --audio-pack DIR   replacement sound effects (sfx/NN.ogg) and music (music/NN.ogg|.mid)
-  --soundfont FILE   SoundFont (.sf2) for MIDI music (--midi-music and
-                     .mid files of an audio pack)
-  --midi-music       play the music as General MIDI converted from the
-                     original AdLib songs (needs a SoundFont: --soundfont,
-                     or soundfont.sf2 in the data directory or next to
-                     the executable)
+  --soundfont FILE   SoundFont (.sf2) for the MIDI music (CONFIGURE >
+                     MUSIC > MIDI MUSIC) and .mid files of an audio pack;
+                     default: the first .sf2 in the data directory, next
+                     to the executable or in the current directory
   --export-midi DIR  write the songs as DIR/music/NN.mid (DIR can be used
                      as --audio-pack after editing them) and exit
   --window-scale N   window size multiplier (default 3)
@@ -25,8 +23,9 @@ const USAGE: &str = "keenN [options]
   --windowed         start in a window
   --no-aspect        do not stretch to 4:3
   --classic          the game as it was: no widescreen, no MIDI music, no
-                     autosave and no quick save (gamepad save/load state,
-                     load menu page 2, --cheatmode F2/F3)
+                     volume settings, no autosave and no quick save
+                     (gamepad save/load state, load menu page 2,
+                     --cheatmode F2/F3)
   --classic-view     keep the original 320x200 play field (otherwise it
                      widens to the window's shape, e.g. 16:9)
   --system-shortcuts keep the macOS keyboard shortcuts (Ctrl+arrows switch
@@ -58,7 +57,6 @@ pub fn main(default_dir: &str) {
     let mut dump_dir: Option<PathBuf> = None;
     let mut midi_dir: Option<PathBuf> = None;
     let mut sfx_dir: Option<PathBuf> = None;
-    let mut midi_music = false;
     let mut gfx_pack: Option<PathBuf> = None;
     let mut audio_pack: Option<PathBuf> = None;
     let mut soundfont: Option<PathBuf> = None;
@@ -81,7 +79,6 @@ pub fn main(default_dir: &str) {
             "--gfx-pack" => gfx_pack = Some(PathBuf::from(next(&mut i))),
             "--audio-pack" => audio_pack = Some(PathBuf::from(next(&mut i))),
             "--soundfont" => soundfont = Some(PathBuf::from(next(&mut i))),
-            "--midi-music" => midi_music = true,
             "--export-midi" => midi_dir = Some(PathBuf::from(next(&mut i))),
             "--export-sfx" => sfx_dir = Some(PathBuf::from(next(&mut i))),
             "--window-scale" => window_scale = next(&mut i).parse().unwrap_or(3),
@@ -127,10 +124,6 @@ pub fn main(default_dir: &str) {
     if opts.classic {
         opts.classic_view = true;
         opts.no_auto_save = true;
-        if midi_music {
-            eprintln!("--classic: ignoring --midi-music");
-            midi_music = false;
-        }
     }
     let data = match GameData::load_with_maps(&data_dir, maps_dir.as_deref()) {
         Ok(d) => d,
@@ -140,7 +133,7 @@ pub fn main(default_dir: &str) {
         }
     };
     if let Ok(spec) = std::env::var("KEEN_RENDER_WAV") {
-        // "song:N:file.wav", "midi:N:file.wav" (--midi-music) or
+        // "song:N:file.wav", "midi:N:file.wav" (MIDI music) or
         // "pc:N:file.wav" / "adlib:N:file.wav"
         let p: Vec<&str> = spec.split(':').collect();
         let n: usize = p.get(1).and_then(|v| v.parse().ok()).unwrap_or(0);
@@ -148,7 +141,7 @@ pub fn main(default_dir: &str) {
         let r = match p[0] {
             "song" => crate::engine::sound::render_to_wav(&data.audio, Some(n), None, 20.0, path),
             "midi" => {
-                let sf = soundfont.clone().or_else(|| crate::engine::sound::find_soundfont(&data_dir)).expect("--midi-music needs a SoundFont (--soundfont FILE)");
+                let sf = soundfont.clone().or_else(|| crate::engine::sound::find_soundfont(&data_dir)).expect("MIDI music needs a SoundFont (--soundfont FILE)");
                 let table = load_instrument_table(audio_pack.as_deref());
                 crate::engine::sound::render_midi_to_wav(&data.audio, n, &sf, &table, 20.0, path)
             }
@@ -174,7 +167,7 @@ pub fn main(default_dir: &str) {
     }
     let scale = gfx_pack.as_deref().map(pack_scale).unwrap_or(1);
     let gfx = Gfx::new(&data.gfx, scale, gfx_pack.as_deref());
-    if midi_music && soundfont.is_none() {
+    if !opts.classic && soundfont.is_none() {
         soundfont = crate::engine::sound::find_soundfont(&data_dir);
     }
     let mut sd = SoundManager::new(&data.audio, sound && !headless, audio_pack.as_deref(), soundfont.as_deref());
@@ -183,8 +176,8 @@ pub fn main(default_dir: &str) {
         Episode::K5 => 5,
         Episode::K6 => 6,
     });
-    if midi_music && !sd.set_midi_music(load_instrument_table(audio_pack.as_deref())) {
-        eprintln!("--midi-music: no SoundFont found (give one with --soundfont FILE.sf2, or put it into the data directory); playing AdLib music");
+    if !opts.classic {
+        sd.allow_midi(load_instrument_table(audio_pack.as_deref()));
     }
     let mut sys = Sys::new(scale, window_scale.max(1), headless, aspect, opts.fullscreen.unwrap_or(false));
     sys.set_grab_hotkeys(!system_shortcuts);
@@ -202,7 +195,7 @@ fn export_midi(data: &crate::assets::GameData, dir: &std::path::Path, audio_pack
     let music = dir.join("music");
     std::fs::create_dir_all(&music)?;
     let mut report = String::from(
-        "# Instruments of the songs and the General MIDI voices --midi-music uses for them.\n\
+        "# Instruments of the songs and the General MIDI voices the MIDI music uses for them.\n\
          # Copy lines to instruments.txt of an --audio-pack and change the voice:\n\
          # [NN:]<patch> <program 0-127>  or  [NN:]<patch> drum <key>   (NN: only in song NN)\n\n",
     );
@@ -219,7 +212,7 @@ fn export_midi(data: &crate::assets::GameData, dir: &std::path::Path, audio_pack
     Ok(())
 }
 
-/// The instrument overrides of `--midi-music`: `instruments.txt` of the
+/// The instrument overrides of the MIDI music: `instruments.txt` of the
 /// audio pack.
 pub fn load_instrument_table(audio_pack: Option<&std::path::Path>) -> crate::assets::midi::InstrumentTable {
     audio_pack

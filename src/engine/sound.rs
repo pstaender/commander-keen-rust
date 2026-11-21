@@ -8,7 +8,7 @@
 //!
 //! Every sound effect and song can be replaced by a modern file (wav, ogg,
 //! flac, mp3; songs may also be .mid when a SoundFont is given). See
-//! `AudioPack`. With `--midi-music` the songs are converted to General MIDI
+//! `AudioPack`. In the MIDI music mode the songs are converted to General MIDI
 //! (`assets::midi`) and played through the SoundFont.
 
 use crate::assets::audio::{AdlibSound, Audio, PcSound, Song};
@@ -34,10 +34,18 @@ pub enum SmMode {
     Off,
     #[default]
     AdLib,
+    /// the songs converted to General MIDI, played through a SoundFont
+    /// (not in the original)
+    Midi,
 }
 
 struct Synth {
+    /// the music; sound effects play on their own chip (`opl_fx`, channel
+    /// 0 like the original) so both can have their own volume
     opl: Opl2,
+    opl_fx: Opl2,
+    music_vol: f32,
+    sfx_vol: f32,
     pcs: Vec<PcSound>,
     adl: Vec<AdlibSound>,
     // sound effects
@@ -67,12 +75,18 @@ struct Synth {
 
 impl Synth {
     fn new(audio: &Audio) -> Synth {
-        let mut opl = Opl2::new(SAMPLE_RATE);
-        // waveform select enable
-        opl.write_reg(0x01, 0x20);
-        opl.write_reg(0x08, 0x00);
+        let new_opl = || {
+            let mut opl = Opl2::new(SAMPLE_RATE);
+            // waveform select enable
+            opl.write_reg(0x01, 0x20);
+            opl.write_reg(0x08, 0x00);
+            opl
+        };
         Synth {
-            opl,
+            opl: new_opl(),
+            opl_fx: new_opl(),
+            music_vol: 1.0,
+            sfx_vol: 1.0,
             pcs: audio.pc.clone(),
             adl: audio.adlib.clone(),
             sound_mode: SdMode::AdLib,
@@ -111,7 +125,7 @@ impl Synth {
 
     fn al_stop(&mut self) {
         self.al_sound = None;
-        self.opl.write_reg(0xb0, 0);
+        self.opl_fx.write_reg(0xb0, 0);
     }
 
     fn stop_sound(&mut self) {
@@ -124,21 +138,21 @@ impl Synth {
         let m = 0u8;
         let c = 3u8;
         let i = s.inst;
-        self.opl.write_reg(m + 0x20, i.m_char);
-        self.opl.write_reg(m + 0x40, i.m_scale);
-        self.opl.write_reg(m + 0x60, i.m_attack);
-        self.opl.write_reg(m + 0x80, i.m_sus);
-        self.opl.write_reg(m + 0xe0, i.m_wave);
-        self.opl.write_reg(c + 0x20, i.c_char);
+        self.opl_fx.write_reg(m + 0x20, i.m_char);
+        self.opl_fx.write_reg(m + 0x40, i.m_scale);
+        self.opl_fx.write_reg(m + 0x60, i.m_attack);
+        self.opl_fx.write_reg(m + 0x80, i.m_sus);
+        self.opl_fx.write_reg(m + 0xe0, i.m_wave);
+        self.opl_fx.write_reg(c + 0x20, i.c_char);
         let mut cs = i.c_scale;
         if self.quiet_adlib {
             let a = 0x3f - (cs & 0x3f);
             cs = 0x3f - ((a >> 1) + (a >> 2));
         }
-        self.opl.write_reg(c + 0x40, cs);
-        self.opl.write_reg(c + 0x60, i.c_attack);
-        self.opl.write_reg(c + 0x80, i.c_sus);
-        self.opl.write_reg(c + 0xe0, i.c_wave);
+        self.opl_fx.write_reg(c + 0x40, cs);
+        self.opl_fx.write_reg(c + 0x60, i.c_attack);
+        self.opl_fx.write_reg(c + 0x80, i.c_sus);
+        self.opl_fx.write_reg(c + 0xe0, i.c_wave);
     }
 
     fn play(&mut self, n: usize) -> bool {
@@ -196,14 +210,14 @@ impl Synth {
             let len = self.adl[n].data.len();
             let s = self.adl[n].data[pos];
             if s == 0 {
-                self.opl.write_reg(0xb0, 0);
+                self.opl_fx.write_reg(0xb0, 0);
             } else {
-                self.opl.write_reg(0xa0, s);
-                self.opl.write_reg(0xb0, self.al_block);
+                self.opl_fx.write_reg(0xa0, s);
+                self.opl_fx.write_reg(0xb0, self.al_block);
             }
             if pos + 1 >= len {
                 self.al_sound = None;
-                self.opl.write_reg(0xb0, 0);
+                self.opl_fx.write_reg(0xb0, 0);
                 self.sound_finished();
             } else {
                 self.al_sound = Some((n, pos + 1));
@@ -255,14 +269,15 @@ impl Synth {
                 self.t0_tick();
             }
             let (l, r) = self.opl.render_frame();
+            let (fl, fr) = self.opl_fx.render_frame();
             // OPL2 is mono (l == r); one operator peaks at about +-4084
-            let mut v = (l + r) as f32 / 16384.0;
+            let mut v = (l + r) as f32 / 16384.0 * self.music_vol + (fl + fr) as f32 / 16384.0 * self.sfx_vol;
             if self.pc_freq > 0.0 {
                 self.pc_phase += self.pc_freq / SAMPLE_RATE as f64;
                 if self.pc_phase >= 1.0 {
                     self.pc_phase -= self.pc_phase.floor();
                 }
-                v += if self.pc_phase < 0.5 { 0.15 } else { -0.15 };
+                v += if self.pc_phase < 0.5 { 0.15 } else { -0.15 } * self.sfx_vol;
             }
             // DC blocker
             let y = v - self.dc_x + 0.995 * self.dc_y;
@@ -399,10 +414,29 @@ pub struct SoundManager {
     ext_sound: i32,
     ext_priority: u16,
     current_song: Option<usize>,
+    /// loaded from `pack.soundfont` when first needed
     soundfont: Option<Arc<rustysynth::SoundFont>>,
-    /// --midi-music: instrument overrides, converted songs
-    midi_music: Option<crate::assets::midi::InstrumentTable>,
+    soundfont_tried: bool,
+    /// MIDI music can be chosen (not with --classic, needs a SoundFont)
+    midi_allowed: bool,
+    /// instrument overrides for the converted songs, and the songs
+    midi_table: crate::assets::midi::InstrumentTable,
     midi_cache: std::collections::HashMap<usize, Arc<rustysynth::MidiFile>>,
+    /// volumes in percent (not in the original)
+    pub sfx_volume: u8,
+    pub music_volume: u8,
+    /// extra gain of what the music sink plays (MIDI is quieter)
+    music_sink_gain: f32,
+    /// MIDI music was chosen but is not available (--classic): the
+    /// config keeps the choice
+    pub midi_requested: bool,
+}
+
+/// Loudness of a volume setting in percent (squared: closer to how loud it
+/// sounds).
+fn vol_gain(v: u8) -> f32 {
+    let f = v.min(100) as f32 / 100.0;
+    f * f
 }
 
 /// Volume of SoundFont music relative to the emulated AdLib.
@@ -433,7 +467,7 @@ fn load_soundfont(path: &Path) -> Option<Arc<rustysynth::SoundFont>> {
     }
 }
 
-/// A SoundFont for --midi-music when none is given: the first .sf2 in the
+/// A SoundFont for the MIDI music when none is given: the first .sf2 in the
 /// data directory, next to the executable or in the current directory, or
 /// a system-wide General MIDI SoundFont.
 pub fn find_soundfont(data_dir: &Path) -> Option<PathBuf> {
@@ -485,8 +519,14 @@ impl SoundManager {
             ext_priority: 0,
             current_song: None,
             soundfont: None,
-            midi_music: None,
+            soundfont_tried: false,
+            midi_allowed: false,
+            midi_table: Default::default(),
             midi_cache: std::collections::HashMap::new(),
+            sfx_volume: 100,
+            music_volume: 100,
+            music_sink_gain: 1.0,
+            midi_requested: false,
         };
         let synth = Arc::new(Mutex::new(Synth::new(audio)));
         if enable {
@@ -501,9 +541,6 @@ impl SoundManager {
                 Err(e) => eprintln!("audio disabled: {}", e),
             }
         }
-        if let Some(sf) = &sm.pack.soundfont {
-            sm.soundfont = load_soundfont(sf);
-        }
         sm.synth = Some(synth);
         sm
     }
@@ -513,19 +550,50 @@ impl SoundManager {
         self.pack.episode = Some(format!("k{}", episode));
     }
 
-    /// --midi-music: play the songs converted to General MIDI (`table`:
-    /// instrument overrides). Needs a SoundFont; returns false without one.
-    pub fn set_midi_music(&mut self, table: crate::assets::midi::InstrumentTable) -> bool {
-        if self.soundfont.is_none() {
-            return false;
+    /// Allows the MIDI music mode (`table`: instrument overrides); it
+    /// needs a SoundFont (`--soundfont` or one found by `find_soundfont`).
+    pub fn allow_midi(&mut self, table: crate::assets::midi::InstrumentTable) {
+        self.midi_table = table;
+        self.midi_allowed = true;
+    }
+
+    /// The MIDI music mode can be chosen.
+    pub fn midi_available(&self) -> bool {
+        self.midi_allowed && self.pack.soundfont.is_some()
+    }
+
+    /// The SoundFont, loaded on first use.
+    fn soundfont(&mut self) -> Option<Arc<rustysynth::SoundFont>> {
+        if self.soundfont.is_none() && !self.soundfont_tried {
+            self.soundfont_tried = true;
+            self.soundfont = self.pack.soundfont.as_deref().and_then(load_soundfont);
         }
-        self.midi_music = Some(table);
-        true
+        self.soundfont.clone()
+    }
+
+    /// Sound effect volume in percent.
+    pub fn set_sfx_volume(&mut self, v: u8) {
+        self.sfx_volume = v.min(100);
+        let g = vol_gain(self.sfx_volume);
+        self.with(|s| s.sfx_vol = g);
+        if let Some(s) = &self.sfx_sink {
+            s.set_volume(g);
+        }
+    }
+
+    /// Music volume in percent.
+    pub fn set_music_volume(&mut self, v: u8) {
+        self.music_volume = v.min(100);
+        let g = vol_gain(self.music_volume);
+        self.with(|s| s.music_vol = g);
+        if let Some(s) = &self.music_sink {
+            s.set_volume(g * self.music_sink_gain);
+        }
     }
 
     /// The converted song `n` (cached).
     fn midi_song(&mut self, n: usize) -> Option<Arc<rustysynth::MidiFile>> {
-        let table = self.midi_music.as_ref()?;
+        let table = &self.midi_table;
         if let Some(m) = self.midi_cache.get(&n) {
             return Some(m.clone());
         }
@@ -554,6 +622,8 @@ impl SoundManager {
     }
 
     pub fn set_music_mode(&mut self, m: SmMode) {
+        self.midi_requested = m == SmMode::Midi && !self.midi_available();
+        let m = if self.midi_requested { SmMode::AdLib } else { m };
         self.music_mode = m;
         if m == SmMode::Off {
             self.music_off();
@@ -625,30 +695,35 @@ impl SoundManager {
             return;
         }
         self.current_song = Some(n);
-        if let Some(sink) = &self.music_sink {
-            if let Some(p) = self.pack.find("music", n, &["ogg", "flac", "mp3", "wav"]) {
-                if let Ok(f) = std::fs::File::open(&p) {
-                    if let Ok(dec) = rodio::Decoder::new_looped(f) {
-                        sink.append(dec);
-                        sink.play();
-                        return;
-                    }
+        if let Some(p) = self.pack.find("music", n, &["ogg", "flac", "mp3", "wav"]) {
+            if let (Ok(f), Some(sink)) = (std::fs::File::open(&p), &self.music_sink) {
+                if let Ok(dec) = rodio::Decoder::new_looped(f) {
+                    self.music_sink_gain = 1.0;
+                    sink.set_volume(vol_gain(self.music_volume));
+                    sink.append(dec);
+                    sink.play();
+                    return;
                 }
             }
         }
-        if let (Some(sf), true) = (self.soundfont.clone(), self.music_sink.is_some()) {
+        if self.music_sink.is_some() {
+            // a .mid of the audio pack (with a SoundFont), else in MIDI mode
+            // the converted song
             let mut midi = None;
-            if let Some(p) = self.pack.find("music", n, &["mid"]) {
-                if let Ok(mut f) = std::fs::File::open(&p) {
-                    midi = rustysynth::MidiFile::new(&mut f).ok().map(Arc::new);
+            if self.pack.soundfont.is_some() {
+                if let Some(p) = self.pack.find("music", n, &["mid"]) {
+                    if let Ok(mut f) = std::fs::File::open(&p) {
+                        midi = rustysynth::MidiFile::new(&mut f).ok().map(Arc::new);
+                    }
                 }
             }
-            if midi.is_none() {
+            if midi.is_none() && self.music_mode == SmMode::Midi {
                 midi = self.midi_song(n);
             }
-            if let (Some(m), Some(sink)) = (midi, &self.music_sink) {
-                if let Some(src) = midi_source(&sf, &m) {
-                    sink.set_volume(MIDI_GAIN);
+            if let (Some(m), Some(sf)) = (midi, self.soundfont()) {
+                if let (Some(src), Some(sink)) = (midi_source(&sf, &m), &self.music_sink) {
+                    self.music_sink_gain = MIDI_GAIN;
+                    sink.set_volume(vol_gain(self.music_volume) * MIDI_GAIN);
                     sink.append(src);
                     sink.play();
                     return;

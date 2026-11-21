@@ -11,7 +11,7 @@ runtime and are never committed.
 - `src/assets/` – original file formats: LZEXE unpacker (the EXEs are packed),
   Huffman, Carmack+RLEW, EGAGRAPH (EGA planar → indexed images), GAMEMAPS,
   tile info (from MAPHEAD), AUDIO (PC speaker / AdLib / IMF), `midi.rs`
-  IMF → General MIDI (`--midi-music`, `--export-midi`; instruments are
+  IMF → General MIDI (music mode MIDI MUSIC, `--export-midi`; instruments are
   classified by rendering each OPL patch once, overrides in the audio
   pack's `instruments.txt`). `episode.rs`
   holds the per-episode layout (file names, chunk counts, header offsets in
@@ -85,7 +85,8 @@ runtime and are never committed.
   the control panel (`Surface::extend_edges` continues the arm) go wide
   (`Game::set_screen_width`); title, story etc. stay 320.
 - `--classic` (`Options::classic`) switches the additions off: it implies
-  `classic_view` and `no_auto_save`, ignores `--midi-music` and disables
+  `classic_view` and `no_auto_save`, hides MIDI MUSIC and the volume bars
+  of the sound/music cards and disables
   quick save (gamepad save/load state, load menu page 2, cheat F2/F3).
   New non-original features should respect it.
 - Original globals live in `Game` (src/game/mod.rs); module-private globals
@@ -115,9 +116,11 @@ runtime and are never committed.
 - `--audio-pack DIR`: `sfx/NN.ogg|wav|flac|mp3` replaces sound NN,
   `music/NN.ogg|...|mid` replaces song NN (`--soundfont FILE.sf2` for MIDI);
   `sfx/kN/`, `music/kN/` (N = 4, 5, 6) are per episode and come first.
-- `--midi-music`: songs converted to General MIDI and played through the
-  SoundFont (`--soundfont` or the first `.sf2` found); `--export-midi DIR`
-  writes them as an editable audio pack.
+- MIDI MUSIC (CONFIGURE > MUSIC, `SmMode::Midi`): songs converted to
+  General MIDI and played through the SoundFont (`--soundfont` or the first
+  `.sf2` found, loaded on first use); `--export-midi DIR` writes them as an
+  editable audio pack. Music and sound effects run on separate emulated
+  OPL chips so each has its own volume (VOLUME bars, `config.txt`).
 
 ## Work log
 Major steps and decisions are recorded in `claude_history.log`.
