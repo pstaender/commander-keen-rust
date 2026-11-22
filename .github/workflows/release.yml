@@ -29,7 +29,7 @@ jobs:
       # one cache key per half year, so archive.org is asked at most twice a year
       - name: Cache key
         id: key
-        run: echo "key=keen-data-$(date -u +%Y)-h$(( ($(date -u +%-m) + 5) / 6 ))" >> "$GITHUB_OUTPUT"
+        run: echo "key=keen-data-v2-$(date -u +%Y)-h$(( ($(date -u +%-m) + 5) / 6 ))" >> "$GITHUB_OUTPUT"
 
       # the build jobs restore this cache on every OS (no artifact)
       - name: Cache the original game files
@@ -61,6 +61,16 @@ jobs:
             cp "$src"/* "gamedata/KEEN$n/"
             ls -l "gamedata/KEEN$n"
           done
+
+      # GeneralUser GS (free to redistribute, see its LICENSE.txt) for the
+      # MIDI music, pinned to a commit and checked
+      - name: Download the SoundFont
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          base=https://raw.githubusercontent.com/mrbumpy409/GeneralUser-GS/684543d5e5efaef08d02be50dcda8d552478fa60
+          curl -sSfL --retry 3 -o gamedata/GeneralUser-GS.sf2 "$base/GeneralUser-GS.sf2"
+          curl -sSfL --retry 3 -o gamedata/GeneralUser-GS-LICENSE.txt "$base/documentation/LICENSE.txt"
+          echo "9575028c7a1f589f5770fccc8cff2734566af40cd26ed836944e9a5152688cfe  gamedata/GeneralUser-GS.sf2" | sha256sum -c
 
   build:
     name: ${{ matrix.name }}
@@ -154,12 +164,14 @@ jobs:
           if [ "$RUNNER_OS" = macOS ]; then
             # app bundles with the icon; Keen 4's data inside its bundle
             python3 -I tools/make_icns.py icon.png keen.icns
-            tools/make_app.sh "Keen 4" target/release/keen4 keen.icns "$name" "$name/data/KEEN4"
+            tools/make_app.sh "Keen 4" target/release/keen4 keen.icns "$name" "$name/data/KEEN4" \
+              gamedata/GeneralUser-GS.sf2 gamedata/GeneralUser-GS-LICENSE.txt
             tools/make_app.sh "Keen 5" target/release/keen5 keen.icns "$name"
             tools/make_app.sh "Keen 6" target/release/keen6 keen.icns "$name"
             rm -r "$name/data/KEEN4"
             echo "bin=$name/Keen 4.app/Contents/MacOS/keen4" >> "$GITHUB_OUTPUT"
           else
+            cp gamedata/GeneralUser-GS.sf2 gamedata/GeneralUser-GS-LICENSE.txt "$name/data/"
             for e in 4 5 6; do cp "target/release/keen$e${{ matrix.exe }}" "$name/"; done
             echo "bin=$name/keen4${{ matrix.exe }}" >> "$GITHUB_OUTPUT"
           fi

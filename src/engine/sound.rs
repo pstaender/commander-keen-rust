@@ -468,12 +468,28 @@ fn load_soundfont(path: &Path) -> Option<Arc<rustysynth::SoundFont>> {
 }
 
 /// A SoundFont for the MIDI music when none is given: the first .sf2 in the
-/// data directory, next to the executable or in the current directory, or
-/// a system-wide General MIDI SoundFont.
+/// data directory or its parent (data/ of the release archives), next to
+/// the executable (also in data/ there), in a macOS app bundle's Resources
+/// (also of the other Keen apps beside it), in the current directory, or a
+/// system-wide General MIDI SoundFont.
 pub fn find_soundfont(data_dir: &Path) -> Option<PathBuf> {
     let mut dirs = vec![data_dir.to_path_buf()];
+    if let Some(p) = data_dir.parent() {
+        dirs.push(p.to_path_buf());
+    }
     if let Some(d) = std::env::current_exe().ok().and_then(|e| e.parent().map(|p| p.to_path_buf())) {
-        dirs.push(d);
+        dirs.push(d.join("data"));
+        dirs.push(d.join("../Resources"));
+        // beside the app bundle: data/ and the other apps (the release
+        // ships the SoundFont once, inside Keen 4.app)
+        let beside = d.join("../../..");
+        dirs.push(beside.join("data"));
+        if let Ok(rd) = std::fs::read_dir(&beside) {
+            let mut apps: Vec<PathBuf> = rd.flatten().map(|e| e.path()).filter(|p| p.extension().map(|e| e == "app").unwrap_or(false)).collect();
+            apps.sort();
+            dirs.extend(apps.into_iter().map(|a| a.join("Contents/Resources")));
+        }
+        dirs.insert(1, d);
     }
     dirs.push(PathBuf::from("."));
     for d in dirs {

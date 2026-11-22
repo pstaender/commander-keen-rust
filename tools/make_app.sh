@@ -1,9 +1,11 @@
 #!/bin/sh
 # Wraps a binary into a macOS app bundle:
-#   tools/make_app.sh "Keen 4" target/release/keen4 keen.icns OUTDIR [DATADIR]
-# DATADIR (e.g. KEEN4) is copied to Contents/Resources/data/.
+#   tools/make_app.sh "Keen 4" target/release/keen4 keen.icns OUTDIR [DATADIR [FILES...]]
+# DATADIR (e.g. KEEN4) is copied to Contents/Resources/data/, further FILES
+# (the SoundFont) to Contents/Resources/.
 set -e
 name=$1 bin=$2 icns=$3 out=$4 data=$5
+if [ $# -ge 5 ]; then shift 5; else shift $#; fi
 exe=$(basename "$bin")
 app="$out/$name.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
@@ -13,6 +15,7 @@ if [ -n "$data" ]; then
   mkdir -p "$app/Contents/Resources/data"
   cp -R "$data" "$app/Contents/Resources/data/"
 fi
+for f in "$@"; do cp "$f" "$app/Contents/Resources/"; done
 version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

@@ -52,7 +52,9 @@ runtime and are never committed.
   Support).
 - Release builds: `.github/workflows/release.yml` (on a published
   release; original data from archive.org, cached per half year, for the
-  tests/demo checks; only Keen 4 – shareware – is bundled). `icon.png` is
+  tests/demo checks; only Keen 4 – shareware – is bundled, plus the
+  GeneralUser GS SoundFont, pinned commit + sha256, found by
+  `find_soundfont`). `icon.png` is
   the window icon, the Windows exe icon (`build.rs`) and the macOS app icon
   (`tools/make_icns.py`, `tools/make_app.sh`).
 - `editor/` – Commander Keen Editor (`keen-editor`, workspace member, all

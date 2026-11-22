@@ -26,7 +26,10 @@ The [release downloads](https://github.com/pstaender/commander-keen-rust/release
 (Linux, Windows, macOS) include the shareware episode Keen 4 in `data/KEEN4`
 (on macOS inside `Keen 4.app`), so Keen 4 is playable right away. For Keen 5
 and 6 put your files in `data/KEEN5` / `data/KEEN6` (or use `--data DIR`).
-On macOS the apps are not notarized: open them the first time with right
+The downloads also include the SoundFont
+[GeneralUser GS](https://www.schristiancollins.com/generaluser) by S.
+Christian Collins (its license is in `data/`, on macOS in `Keen 4.app`) for
+MIDI MUSIC. On macOS the apps are not notarized: open them the first time with right
 click > Open. Saves of the bundled Keen 4 go to
 `~/Library/Application Support/Commander Keen/KEEN4`.
 
