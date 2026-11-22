@@ -39,7 +39,7 @@ Play in widescreen mode:
 
 <img width="1840" height="864" alt="widescreen" src="https://github.com/user-attachments/assets/7a850433-dee2-4e36-bdd2-6334ec218613" />
 
-Adding additional lives and armor and replay completed levels with the extended options (EXTENDED OPTIONS in the main menu, which also holds END GAME; off with `--classic`):
+Adding additional lives and armor, unlimited lives and ammo (the score box then leaves those counters empty) and replay completed levels with the extended options (EXTENDED OPTIONS in the main menu, which also holds END GAME; the options are remembered in `config.txt`; off with `--classic`):
 
 <img width="1072" height="864" alt="cheat_options" src="https://github.com/user-attachments/assets/ac6dac4f-fc06-4eba-93f7-c414dfdfd283" />
 

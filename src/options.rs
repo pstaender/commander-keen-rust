@@ -17,12 +17,15 @@ pub struct Options {
     /// extended mode (on unless --classic): EXTENDED OPTIONS replaces END
     /// GAME in the control panel (END GAME moves into it), F2/F3 quick save/load, inventory box
     pub cheatmode: bool,
-    /// extended option: finished levels can be entered again
+    /// extended option: finished levels can be entered again (config.txt
+    /// `allowreenter`)
     pub allow_reenter: bool,
-    /// extended option: dying costs no life
+    /// extended option: dying costs no life (config.txt `unlimitedlives`)
     pub unlimited_lives: bool,
+    /// extended option: firing costs no shot (config.txt `unlimitedammo`)
+    pub unlimited_ammo: bool,
     /// extended option SHOW INVENTORY off: no items box at the bottom right
-    /// (it is only shown in extended mode)
+    /// (it is only shown in extended mode; config.txt `showinventory`)
     pub hide_inventory: bool,
     /// --no-auto-save: no AUTOSAVE.CKn while playing / resume at start
     pub no_auto_save: bool,

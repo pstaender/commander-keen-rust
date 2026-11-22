@@ -178,6 +178,8 @@ pub struct Sys {
     pub border: u8,
     pub input: Input,
     start: Instant,
+    /// two gamepads were seen in the first seconds (reported once)
+    pads_seen_at_start: bool,
     time_offset: i64,
     /// window was closed / quit requested
     pub quit: bool,
@@ -253,9 +255,10 @@ impl Sys {
             // (KEEN_PAD=2: two gamepads)
             input: {
                 let n = if headless { std::env::var("KEEN_PAD").ok().and_then(|v| v.parse().ok()).unwrap_or(0) } else { 0 };
-                Input { pad_connected: n > 0, pad_count: n, ..Input::default() }
+                Input { pad_connected: n > 0, pad_count: n, two_pads_at_start: n >= 2, ..Input::default() }
             },
             start: Instant::now(),
+            pads_seen_at_start: false,
             time_offset: 0,
             quit: false,
             present_buf: Vec::new(),
@@ -486,6 +489,11 @@ impl Sys {
         }
         i.pad_connected = g.gamepads().next().is_some();
         i.pad_count = g.gamepads().count();
+        // (gamepads may show up a moment after the start: connect events)
+        if i.pad_count >= 2 && !self.pads_seen_at_start && self.start.elapsed() < std::time::Duration::from_secs(5) {
+            self.pads_seen_at_start = true;
+            i.two_pads_at_start = true;
+        }
         let mut act = [false; PAD_ACTIONS];
         // two player mode: the actions of the first and the second pad
         let mut per_pad = [[false; PAD_ACTIONS]; 2];

@@ -433,6 +433,9 @@ pub struct Input {
     pub pad_connected: bool,
     /// number of connected gamepads
     pub pad_count: usize,
+    /// two gamepads were found at launch (in the first seconds): two player
+    /// mode is switched on (consumed by the game, `Game::mp_auto_enable`)
+    pub two_pads_at_start: bool,
     /// two player mode (not in the original): the first gamepad plays
     /// Keen, the second one (`pad2_*`), or the keyboard if there is only one
     /// gamepad, the second Keen. Set by the game while a level runs.
@@ -477,6 +480,7 @@ impl Default for Input {
             pad_fire: false,
             pad_connected: false,
             pad_count: 0,
+            two_pads_at_start: false,
             split: false,
             pad2_x: 0,
             pad2_y: 0,

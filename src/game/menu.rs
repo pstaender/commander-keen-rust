@@ -109,7 +109,7 @@ const JERKCARD: usize = 18;
 /// main menu and holds it as its last entry)
 const CHEATCARD: usize = 19;
 /// the END GAME entry of the extended options card
-const CHEAT_ENDGAME_ITEM: usize = 5;
+const CHEAT_ENDGAME_ITEM: usize = 6;
 /// a gamepad is connected: "USE GAMEPAD" (replaces the joystick entries
 /// of the config card) and its movement / button binding cards
 const PADCARD: usize = 20;
@@ -359,6 +359,7 @@ fn build_cards() -> Vec<Card> {
                 b(0x1f, "ADD EXTRA SHOT", 0),
                 b(0x13, "ALLOW RE-ENTER", 0),
                 b(0x16, "UNLIMITED LIVES", 0),
+                b(0x1e, "UNLIMITED AMMO", 0),
                 b(0x17, "SHOW INVENTORY", 0),
                 b(0x12, "END GAME", 2),
             ],
@@ -1101,6 +1102,7 @@ impl Game {
 
     /// USL_SetOptionsText (0x29c9a)
     fn usl_set_options_text(&mut self) {
+        self.mp_auto_enable();
         let showscorebox = self.showscorebox;
         let compat = self.menu.compatibility;
         let two = self.twobutton;
@@ -1538,7 +1540,8 @@ impl Game {
                     1 => format!("ADD EXTRA SHOT [{}]", self.gs.ammo),
                     2 => format!("ALLOW RE-ENTER [{}]", if self.opts.allow_reenter { "X" } else { " " }),
                     3 => format!("UNLIMITED LIVES [{}]", if self.opts.unlimited_lives { "X" } else { " " }),
-                    4 => format!("SHOW INVENTORY [{}]", if self.opts.hide_inventory { " " } else { "X" }),
+                    4 => format!("UNLIMITED AMMO [{}]", if self.opts.unlimited_ammo { "X" } else { " " }),
+                    5 => format!("SHOW INVENTORY [{}]", if self.opts.hide_inventory { " " } else { "X" }),
                     _ => return false,
                 };
                 self.usl_draw_item_text(i, &text);
@@ -1552,7 +1555,8 @@ impl Game {
                     0 => self.gs.lives = (self.gs.lives + 1).min(CHEATMAX),
                     1 => self.gs.ammo = (self.gs.ammo + 1).min(CHEATMAX),
                     3 => self.opts.unlimited_lives = !self.opts.unlimited_lives,
-                    4 => self.opts.hide_inventory = !self.opts.hide_inventory,
+                    4 => self.opts.unlimited_ammo = !self.opts.unlimited_ammo,
+                    5 => self.opts.hide_inventory = !self.opts.hide_inventory,
                     _ => {
                         self.opts.allow_reenter = !self.opts.allow_reenter;
                         // on the world map the level entries change at once
@@ -3045,6 +3049,10 @@ impl Game {
                 "jerk" => self.menu.jerk = n == 1,
                 "twobutton" => self.twobutton = n == 1,
                 "twoplayers" => self.mp.enabled = n == 1,
+                "unlimitedlives" => self.opts.unlimited_lives = n == 1,
+                "unlimitedammo" => self.opts.unlimited_ammo = n == 1,
+                "allowreenter" => self.opts.allow_reenter = n == 1,
+                "showinventory" => self.opts.hide_inventory = n == 0,
                 "controltype" => self.menu.controltype = 0,
                 "button0" => d.button0 = sc.unwrap_or(d.button0),
                 "button1" => d.button1 = sc.unwrap_or(d.button1),
@@ -3071,6 +3079,7 @@ impl Game {
         }
         self.sd.set_quiet(quiet);
         self.apply_volumes();
+        self.mp_auto_enable();
     }
 
     /// USL_WriteConfig (0x282af), as a text file `config.txt`.
@@ -3109,6 +3118,13 @@ impl Game {
             text += &format!("jerk={}\n", b(self.menu.jerk));
         }
         text += &format!("twoplayers={}\n", b(self.mp.enabled));
+        text += &format!(
+            "unlimitedlives={}\nunlimitedammo={}\nallowreenter={}\nshowinventory={}\n",
+            b(self.opts.unlimited_lives),
+            b(self.opts.unlimited_ammo),
+            b(self.opts.allow_reenter),
+            b(!self.opts.hide_inventory)
+        );
         for (k, p) in PAD_ACTION_KEYS.iter().zip(self.sys.input.pad_map) {
             text += &format!("{}={}\n", k, p.encode());
         }

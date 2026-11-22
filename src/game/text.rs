@@ -85,7 +85,7 @@ No calibration is needed.  Even cheap gamepads that the computer doesn't know wo
 ^P
 {D}{H}TWO PLAYERS
 {B}
-Bring a friend! Turn on Two Players under Configure, Use Gamepad. In the levels a second Keen joins in: player 1 uses the gamepad, player 2 a second gamepad or the keyboard. Player 2 wears a blue helmet and a green shirt. On the world map he tags along behind player 1.
+Bring a friend! Turn on Two Players under Configure, Use Gamepad (it is on by itself when two gamepads are plugged in at the start). In the levels a second Keen joins in: player 1 uses the gamepad, player 2 a second gamepad or the keyboard. Player 2 wears a blue helmet and a green shirt. On the world map he tags along behind player 1.
 
 The view follows player 1. If player 2 is lost off the screen, he is brought back. Keys, gems and lives are shared (you start with twice as many lives), shots you find go to both, but each Keen keeps his own score.
 ^P

@@ -154,11 +154,17 @@ impl Game {
         // score: 9 digits at (8,4)
         let s = score.to_string();
         self.draw_score_digits(&s, 9, base_x + 8, base_y + 4);
-        // ammo: 2 digits at (64,20)
-        let a = if ammo < 100 { ammo.to_string() } else { "99".into() };
+        // ammo: 2 digits at (64,20); lives: 2 digits at (24,20). Left
+        // empty with the extended options UNLIMITED AMMO / LIVES.
+        let a = if self.unlimited_ammo() { String::new() } else if ammo < 100 { ammo.to_string() } else { "99".into() };
         self.draw_score_digits(&a, 2, base_x + 64, base_y + 20);
-        // lives: 2 digits at (24,20)
-        let l = if self.gs.lives < 100 { self.gs.lives.to_string() } else { "99".into() };
+        let l = if self.unlimited_lives() {
+            String::new()
+        } else if self.gs.lives < 100 {
+            self.gs.lives.to_string()
+        } else {
+            "99".into()
+        };
         self.draw_score_digits(&l, 2, base_x + 24, base_y + 20);
     }
 
@@ -506,11 +512,14 @@ impl Game {
     /// SpawnShot (0x1cf04); in Keen 4 (0x1dbd8) and Keen 5 (0x1dc95) the
     /// new shot does not hit objects right away.
     pub fn spawn_shot(&mut self, x: i32, y: i32, dir: i32) {
-        if self.gs.ammo == 0 {
-            self.play_sound(super::keen::SND_USESWITCH);
-            return;
+        // (extended option UNLIMITED AMMO: firing costs nothing)
+        if !self.unlimited_ammo() {
+            if self.gs.ammo == 0 {
+                self.play_sound(super::keen::SND_USESWITCH);
+                return;
+            }
+            self.gs.ammo -= 1;
         }
-        self.gs.ammo -= 1;
         let n = self.get_new_obj(true);
         {
             let o = &mut self.objs[n];

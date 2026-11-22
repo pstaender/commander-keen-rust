@@ -158,6 +158,13 @@ impl Game {
         self.mp.flipped = false;
     }
 
+    /// Two gamepads at launch: two player mode on (not with --classic).
+    pub fn mp_auto_enable(&mut self) {
+        if std::mem::take(&mut self.sys.input.two_pads_at_start) && !self.opts.classic {
+            self.mp.enabled = true;
+        }
+    }
+
     /// The Keen object `ob` is played by player 2 (drawn recolored).
     pub fn mp_is_player2(&self, ob: usize) -> bool {
         match self.mp_player_of(ob) {
@@ -329,6 +336,7 @@ impl Game {
     /// the world map and not where Keen doesn't start on his feet, like
     /// Keen 4's underwater level).
     pub fn mp_setup_level(&mut self) {
+        self.mp_auto_enable();
         self.mp_unflip();
         self.mp.p2 = None;
         self.mp.respawn = 0;
@@ -542,6 +550,7 @@ impl Game {
     /// little behind him. Only a sprite: he does nothing there, and saved
     /// games, demos and the map logic don't know him.
     pub fn mp_world_tick(&mut self) {
+        self.mp_auto_enable();
         if self.gs.mapon != 0 || !self.mp_available() {
             self.rf.extra.clear();
             return;
@@ -720,7 +729,9 @@ mod tests {
         let gfx = Gfx::new(&data.gfx, 1, None);
         let sd = SoundManager::new(&data.audio, false, None, None);
         let sys = Sys::new(1, 1, true, true, false);
-        let mut g = Game::new(sys, data, gfx, sd, Default::default());
+        // (extended mode is on unless --classic)
+        let opts = crate::options::Options { cheatmode: true, ..Default::default() };
+        let mut g = Game::new(sys, data, gfx, sd, opts);
         g.data.dir = tmp.to_path_buf();
         g.data.write_dir = tmp.to_path_buf();
         g.sys.input.pad_connected = true;
@@ -882,6 +893,41 @@ mod tests {
         g.objs[shot].owner = 1;
         g.as_p2(|g| assert!(g.mp_shot_hits_keen(p2, shot)));
         assert!(same(g.objs[p2].state, &S_KEENFALL1));
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn unlimited_ammo_and_two_pads_at_start() {
+        let tmp = std::env::temp_dir().join(format!("keen-mp-ammo-{}-{}", super::super::EPISODE, std::process::id()));
+        let _ = std::fs::create_dir_all(&tmp);
+        let Some(mut g) = two_player_game(&tmp) else { return };
+        g.gs.ammo = 0;
+        let (x, y) = (g.objs[g.player].x, g.objs[g.player].y);
+        let used = |g: &Game| g.obj_free.iter().filter(|&&f| !f).count();
+        let n = used(&g);
+        g.spawn_shot(x, y, 1);
+        assert_eq!((g.gs.ammo, used(&g)), (0, n));
+        // (the shot may hit something at once and explode, still an object)
+        g.opts.unlimited_ammo = true;
+        g.spawn_shot(x, y, 1);
+        assert_eq!((g.gs.ammo, used(&g)), (0, n + 1));
+        // never with --classic (no extended mode)
+        g.opts.cheatmode = false;
+        assert!(!g.unlimited_ammo() && !g.unlimited_lives());
+        // remembered in config.txt
+        g.opts.cheatmode = true;
+        g.opts.unlimited_lives = true;
+        g.opts.allow_reenter = true;
+        g.opts.hide_inventory = true;
+        g.save_config();
+        g.opts = crate::options::Options { cheatmode: true, ..Default::default() };
+        g.load_config();
+        assert!(g.opts.unlimited_ammo && g.opts.unlimited_lives && g.opts.allow_reenter && g.opts.hide_inventory);
+        // two gamepads at the start: two player mode on (once)
+        g.mp.enabled = false;
+        g.sys.input.two_pads_at_start = true;
+        g.mp_auto_enable();
+        assert!(g.mp.enabled && !g.sys.input.two_pads_at_start);
         let _ = std::fs::remove_dir_all(&tmp);
     }
 }

@@ -79,9 +79,15 @@ impl Game {
         self.opts.allow_reenter && self.demomode == 0
     }
 
-    /// Extended option UNLIMITED LIVES (not in demos).
+    /// Extended option UNLIMITED LIVES (not in demos, only in extended
+    /// mode: config.txt may have it on with --classic).
     pub fn unlimited_lives(&self) -> bool {
-        self.opts.unlimited_lives && self.demomode == 0
+        self.opts.unlimited_lives && self.opts.cheatmode && self.demomode == 0
+    }
+
+    /// Extended option UNLIMITED AMMO (like UNLIMITED LIVES).
+    pub fn unlimited_ammo(&self) -> bool {
+        self.opts.unlimited_ammo && self.opts.cheatmode && self.demomode == 0
     }
 
     /// Extended options card: adds or removes the entries of finished levels on the

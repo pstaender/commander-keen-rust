@@ -98,7 +98,9 @@ runtime and are never committed.
   hand can point at the HELP! title: `NEW_HELP` in text.rs, the pages about
   this version (keep it current when adding features).
 - Two player mode (`src/game/mp.rs`, CONFIGURE > USE GAMEPAD > TWO
-  PLAYERS, offered when a gamepad is detected, config `twoplayers`): a second Keen object in
+  PLAYERS, offered when a gamepad is detected, config `twoplayers`; switched
+  on by itself when two gamepads show up in the first seconds,
+  `Input::two_pads_at_start`, `mp_auto_enable`): a second Keen object in
   levels (not in demos, not with --classic, needs a gamepad); on the world
   map only a sprite following Keen 1's path (`mp_world_tick`,
   `RfState::extra`). Keen 2 is drawn 2 pixels higher (`ALTYOFFSET`)

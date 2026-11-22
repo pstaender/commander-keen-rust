@@ -642,7 +642,11 @@ impl Game {
                     continue;
                 }
                 let b = self.map_tile(0, mx, my);
-                if let Some(Some(t)) = self.gfx.tile16.get(b) {
+                // Keen 5's world map fills what the original view never
+                // shows with a yellow tile: black, for the wide view
+                if super::EPISODE == 5 && b == 850 && self.gs.mapon == 0 {
+                    self.sys.surface.bar(px, py, 16, 16, 0);
+                } else if let Some(Some(t)) = self.gfx.tile16.get(b) {
                     self.sys.surface.blit_phys(t, px * scale, py * scale);
                 }
                 let f = self.map_tile(1, mx, my);
