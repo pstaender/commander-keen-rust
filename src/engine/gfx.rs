@@ -46,7 +46,8 @@ pub fn alt_tex(src: &Tex) -> Tex {
 }
 
 /// Player 2's colors: Keen's yellow helmet turns blue with light red
-/// stripes (green before), his pink shirt green and his cyan trousers gray.
+/// stripes (green before), his pink shirt green and the cyan of his
+/// trousers light blue (next to their dark blue).
 /// (EGA color, replacement) pairs, applied in one pass; a pixel near one
 /// of the EGA colors is moved by the same difference, so the shading of
 /// high resolution packs survives.
@@ -55,7 +56,7 @@ const ALT_COLORS: [(u32, u32); 5] = [
     (0x00aa00, 0xff5555),
     (0xff55ff, 0x55ff55),
     (0xaa00aa, 0x00aa00),
-    (0x55ffff, 0xaaaaaa),
+    (0x55ffff, 0x5555ff),
 ];
 
 fn alt_color(p: u32) -> u32 {
