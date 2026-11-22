@@ -122,13 +122,15 @@ pub struct SpriteSlot {
     pub order: i64,
     /// RF maskdraw: draw the sprite's shape in white
     pub white: bool,
-    /// two player mode: player 2's colors (not in the original)
-    pub alt: bool,
+    /// multiplayer: drawn in the colors of this player (0 = player 1's,
+    /// Keen's own; 1-3 = players 2-4; not in the original)
+    pub alt: u8,
     /// two player mode: a dizzy Keen, drawn sitting (`Gfx::stunned`)
     pub stunned: bool,
     /// two player mode: the Keen who doesn't lead (the view follows the
-    /// other one), drawn behind him whatever his colors
-    pub behind: bool,
+    /// other one): his place behind him (0: the leading Keen, 1-3: the
+    /// others, further back the higher), whatever his colors
+    pub depth: u8,
 }
 
 /// One animation group (allanims entry).
@@ -658,13 +660,13 @@ impl Game {
             self.rf.order += 1;
             -self.rf.order
         };
-        let alt = self.mp_is_player2(ob);
-        // (two player mode: the Keen who doesn't lead is drawn behind the
-        // other one and 2 pixels higher, so the Keens never cover each
-        // other completely)
-        let behind = self.mp_player_of(ob) == Some(1);
-        let y = if behind { y - super::mp::ALTYOFFSET } else { y };
-        self.rf.sprites[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false, alt, stunned: false, behind };
+        let alt = self.mp_person_of(ob).unwrap_or(0) as u8;
+        // (multiplayer: the Keens who don't lead are drawn behind the
+        // leading one, one behind the other and each 2 pixels higher than
+        // the one in front, so the Keens never cover each other completely)
+        let depth = self.mp_player_of(ob).unwrap_or(0) as u8;
+        let y = y - super::mp::ALTYOFFSET * depth as i32;
+        self.rf.sprites[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false, alt, stunned: false, depth };
         self.objs[ob].sprite = true;
     }
 
@@ -676,7 +678,7 @@ impl Game {
             self.rf.order += 1;
             -self.rf.order
         };
-        self.rf.stars[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false, alt: false, stunned: false, behind: false };
+        self.rf.stars[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false, alt: 0, stunned: false, depth: 0 };
     }
 
     /// Switches the placed sprite of `ob` to white (maskdraw) drawing.
@@ -712,7 +714,7 @@ impl Game {
                 let gpy = ((s.y + st.orgy) as u16 as i32) >> 4;
                 let px = (gpx - (self.cam.originxglobal >> 4)) as i16 as i32;
                 let py = (gpy - (self.cam.originyglobal >> 4)) as i16 as i32;
-                let tex = if s.alt { &st.alt } else { &st.tex };
+                let tex = if s.alt > 0 { &st.alt[(s.alt as usize - 1).min(2)] } else { &st.tex };
                 self.sys.surface.blit_phys(tex, px * scale, py * scale);
                 return;
             }
@@ -735,7 +737,7 @@ impl Game {
         let px = (gpx - (self.cam.originxglobal >> 4)) as i16 as i32;
         let py = (gpy - (self.cam.originyglobal >> 4)) as i16 as i32;
         let (px, py) = (px * scale, py * scale);
-        let tex = if s.alt { self.gfx.alt_sprite(idx as usize) } else { &self.gfx.sprites[idx as usize] };
+        let tex = if s.alt > 0 { self.gfx.alt_sprite(s.alt as usize + 1, idx as usize) } else { &self.gfx.sprites[idx as usize] };
         if s.white {
             self.sys.surface.blit_phys_solid(tex, px, py, 0xffffffff);
         } else {
@@ -794,7 +796,8 @@ impl Game {
             self.rf.sprites.iter().chain(self.rf.stars.iter()).chain(self.rf.extra.iter()).filter(|s| s.visible).copied().collect();
         // (two player mode: the Keen who doesn't lead first, i.e. behind
         // the one the view follows)
-        list.sort_by_key(|s| (s.priority, if s.behind { i64::MIN } else { s.order }));
+        // (the furthest back first)
+        list.sort_by_key(|s| (s.priority, if s.depth > 0 { i64::MIN + 8 - s.depth as i64 } else { s.order }));
         let mut i = 0;
         for pr in 0..PRIORITIES {
             if pr == MASKEDTILEPRIORITY {

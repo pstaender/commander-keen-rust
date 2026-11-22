@@ -73,7 +73,7 @@ Press F11 (or Cmd+F on a Mac, Win+F on Windows) to switch between a window and f
 ^P
 {D}{H}ZOOM
 {B}
-Want to see even more? Press the minus key while you play to zoom out to 75 or 50 percent, and the plus key to zoom back in. Everything gets smaller, but you can see much more of the level above, below and around Keen. That is handy with two players.
+Want to see even more? Press the minus key while you play to zoom out to 75 or 50 percent, and the plus key to zoom back in. Everything gets smaller, but you can see much more of the level above, below and around Keen. That is handy with more players.
 
 You can also change Zoom under Extended Options. Keen remembers your choice.
 ^P
@@ -89,17 +89,19 @@ In the ComputerWrist the gamepad moves the hand, the jump button chooses an item
 
 No calibration is needed.  Even cheap gamepads that the computer doesn't know work fine.
 ^P
-{D}{H}TWO PLAYERS
+{D}{H}MORE PLAYERS
 {B}
-Bring a friend! Turn on Two Players under Configure, Use Gamepad or under Extended Options (it is on by itself when two gamepads are plugged in at the start). In the levels a second Keen joins in: player 1 uses the gamepad, player 2 a second gamepad or the keyboard. Player 2 wears a blue helmet and a green shirt. On the world map he tags along behind player 1.
+Bring your friends! Choose up to four Players under Extended Options or Configure, Use Gamepad (two players are chosen by themselves when two gamepads are plugged in at the start). Every player needs a gamepad, except the last one, who may use the keyboard.
 
-The view follows player 1. If player 2 is lost off the screen, he is brought back. Keys, gems and lives are shared (you start with twice as many lives), shots you find go to both, but each Keen keeps his own score.
+Player 2 wears a blue helmet and a green shirt, player 3 a yellow shirt and player 4 a red one. On the world map they tag along behind player 1.
 ^P
-{D}{H}TWO PLAYERS (cont'd.)
+{D}{H}MORE PLAYERS (cont'd.)
 {B}
-Careful where you aim: a stunner shot makes the other Keen dizzy for two seconds. He falls off his pogo stick, sits down and sees stars.
+The view follows player 1. A Keen lost off the screen is brought back. Keys, gems and lives are shared (you start with three lives for each player), shots you find go to everybody, but each Keen keeps his own score.
 
-When a Keen dies, the other one plays on, and the view follows him. The fallen Keen comes back next to him for one of the lives. If there are none left, he waits for the next level.
+Careful where you aim: a stunner shot makes another Keen dizzy for two seconds. He falls off his pogo stick, sits down and sees stars.
+
+When the leading Keen dies, the next one plays on, and the view follows him. The fallen Keen comes back for one of the lives. If there are none left, he waits for the next level.
 ^P
 {D}{H}QUICK SAVE
 {B}

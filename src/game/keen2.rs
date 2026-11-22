@@ -78,22 +78,24 @@ impl Game {
         if !self.showscorebox {
             return;
         }
-        let mut first = (self.gs.score, self.gs.ammo);
-        let mut second = self.mp_p2_status();
-        // (player 2 took the lead: the first Keen's values are his)
-        if self.mp.flipped {
-            if let Some(s) = second {
-                second = Some(first);
-                first = s;
-            }
-        }
-        self.draw_score_box_for(4, first.0, first.1, false);
-        // two player mode: player 2's box at the top right
-        if let Some((score, ammo)) = second {
-            let idx = (SCOREBOXSPR - super::consts::STARTSPRITES as i32) as usize;
-            let w = self.gfx.sprites.get(idx).map_or(0, |t| t.w as i32 / scale);
-            let x = self.cam.view_w() - w - 4;
-            self.draw_score_box_for(x, score, ammo, true);
+        // multiplayer: a box per player in his colors, player 1 at the top
+        // left, 2 at the top right, 3 next to 1 and 4 next to 2 (in a
+        // second row if the view is too narrow for them side by side)
+        let idx = (SCOREBOXSPR - super::consts::STARTSPRITES as i32) as usize;
+        let (w, h) = self.gfx.sprites.get(idx).map_or((0, 0), |t| (t.w as i32 / scale, t.h as i32 / scale));
+        let vw = self.cam.view_w();
+        let row = (vw - 4) / (w + 4) >= 4;
+        for n in 0..super::mp::MAXPLAYERS {
+            let Some((score, ammo)) = self.mp_status(n) else { continue };
+            let (x, y) = match n {
+                0 => (4, 4),
+                1 => (vw - w - 4, 4),
+                2 if row => (w + 8, 4),
+                2 => (4, h + 8),
+                _ if row => (vw - 2 * w - 8, 4),
+                _ => (vw - w - 4, h + 8),
+            };
+            self.draw_score_box_for(x, y, score, ammo, n);
         }
     }
 
@@ -157,21 +159,22 @@ impl Game {
         }
     }
 
-    /// One score box at (x, 4): score, shots and the (shared) lives.
-    fn draw_score_box_for(&mut self, x: i32, score: i32, ammo: i32, alt: bool) {
+    /// One score box at (x, y) in the colors of player `n` (0 = player
+    /// 1): score, shots and the (shared) lives.
+    fn draw_score_box_for(&mut self, x: i32, y: i32, score: i32, ammo: i32, n: usize) {
         let scale = self.sys.surface.scale as i32;
-        if alt {
+        if n > 0 {
             let idx = (SCOREBOXSPR - super::consts::STARTSPRITES as i32) as usize;
             let (ox, oy) = self.sprite_origin(SCOREBOXSPR);
             if idx < self.gfx.sprites.len() {
-                let t = self.gfx.alt_sprite(idx);
-                self.sys.surface.blit_phys(t, (x + ox) * scale, (4 + oy) * scale);
+                let t = self.gfx.alt_sprite(n + 1, idx);
+                self.sys.surface.blit_phys(t, (x + ox) * scale, (y + oy) * scale);
             }
         } else {
-            self.draw_overlay_sprite(SCOREBOXSPR, x, 4, scale);
+            self.draw_overlay_sprite(SCOREBOXSPR, x, y, scale);
         }
         let base_x = x + self.sprite_origin(SCOREBOXSPR).0;
-        let base_y = 4 + self.sprite_origin(SCOREBOXSPR).1;
+        let base_y = y + self.sprite_origin(SCOREBOXSPR).1;
         // score: 9 digits at (8,4)
         let s = score.to_string();
         self.draw_score_digits(&s, 9, base_x + 8, base_y + 4);

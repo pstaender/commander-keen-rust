@@ -505,8 +505,8 @@ impl Sys {
             i.two_pads_at_start = true;
         }
         let mut act = [false; PAD_ACTIONS];
-        // two player mode: the actions of the first and the second pad
-        let mut per_pad = [[false; PAD_ACTIONS]; 2];
+        // multiplayer: the actions of each pad
+        let mut per_pad = [[false; PAD_ACTIONS]; 4];
         for (n, (id, pad)) in g.gamepads().enumerate() {
             let dpad = self.pad_dpad.get(&usize::from(id)).copied().unwrap_or_default();
             let mut a = [false; PAD_ACTIONS];
@@ -530,7 +530,7 @@ impl Sys {
             for k in 0..PAD_ACTIONS {
                 act[k] |= a[k];
             }
-            if n < 2 {
+            if n < 4 {
                 per_pad[n] = a;
             }
         }
@@ -541,11 +541,7 @@ impl Sys {
         i.pad_jump = false;
         i.pad_pogo = false;
         i.pad_fire = false;
-        i.pad2_x = 0;
-        i.pad2_y = 0;
-        i.pad2_jump = false;
-        i.pad2_pogo = false;
-        i.pad2_fire = false;
+        i.pads = Default::default();
         if i.pad_capture {
             if captured.is_some() {
                 i.pad_captured = captured;
@@ -582,18 +578,25 @@ impl Sys {
             }
             return;
         }
-        // two player mode: each pad plays its own Keen
-        let (p1, p2) = if i.split { (per_pad[0], per_pad[1]) } else { (act, [false; PAD_ACTIONS]) };
-        i.pad_x = if p1[PAD_LEFT] { -1 } else if p1[PAD_RIGHT] { 1 } else { 0 };
-        i.pad_y = if p1[PAD_UP] { -1 } else if p1[PAD_DOWN] { 1 } else { 0 };
-        i.pad_jump = p1[PAD_JUMP];
-        i.pad_pogo = p1[PAD_POGO];
-        i.pad_fire = p1[PAD_FIRE];
-        i.pad2_x = if p2[PAD_LEFT] { -1 } else if p2[PAD_RIGHT] { 1 } else { 0 };
-        i.pad2_y = if p2[PAD_UP] { -1 } else if p2[PAD_DOWN] { 1 } else { 0 };
-        i.pad2_jump = p2[PAD_JUMP];
-        i.pad2_pogo = p2[PAD_POGO];
-        i.pad2_fire = p2[PAD_FIRE];
+        // multiplayer: each pad plays its own Keen
+        let ctl = |a: &[bool; PAD_ACTIONS]| super::input::PadControl {
+            x: if a[PAD_LEFT] { -1 } else if a[PAD_RIGHT] { 1 } else { 0 },
+            y: if a[PAD_UP] { -1 } else if a[PAD_DOWN] { 1 } else { 0 },
+            jump: a[PAD_JUMP],
+            pogo: a[PAD_POGO],
+            fire: a[PAD_FIRE],
+        };
+        let p1 = ctl(if i.players >= 2 { &per_pad[0] } else { &act });
+        i.pad_x = p1.x;
+        i.pad_y = p1.y;
+        i.pad_jump = p1.jump;
+        i.pad_pogo = p1.pogo;
+        i.pad_fire = p1.fire;
+        if i.players >= 2 {
+            for n in 0..4 {
+                i.pads[n] = ctl(&per_pad[n]);
+            }
+        }
         if pressed(PAD_JUMP) {
             i.last_scan = SC_SPACE;
         }

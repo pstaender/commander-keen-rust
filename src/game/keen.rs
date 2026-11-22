@@ -179,7 +179,7 @@ impl Game {
         self.set_moonok(0);
         self.invincible = 30;
         // (two player mode: the camera stays with player 1)
-        if !self.mp.swapped {
+        if self.mp.cur == 0 {
             self.scrolllock = true;
         }
         self.objs[p].needtoclip = CL_NOCLIP;
@@ -610,7 +610,7 @@ pub fn keen_enter_think(g: &mut Game, ob: usize) {
     g.objs[ob].needtoclip = CL_MIDCLIP;
     // two player mode: the other Keen comes along through the door (the
     // camera follows the first Keen)
-    if !g.mp.swapped {
+    if g.mp.cur == 0 {
         g.center_actor(ob);
     }
     g.mp_follow_door();

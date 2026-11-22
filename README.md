@@ -39,7 +39,7 @@ Play in widescreen mode:
 
 <img width="1840" height="864" alt="widescreen" src="https://github.com/user-attachments/assets/7a850433-dee2-4e36-bdd2-6334ec218613" />
 
-Adding additional lives and armor, unlimited lives and ammo (the score box then leaves those counters empty), zoom out the play field (see [Zoom](#zoom)), switch two player mode on or off (with a gamepad connected) and replay completed levels with the extended options (EXTENDED OPTIONS in the main menu, which also holds END GAME; the options are remembered in `config.txt`; off with `--classic`):
+Adding additional lives and armor, unlimited lives and ammo (the score box then leaves those counters empty), zoom out the play field (see [Zoom](#zoom)), choose the number of players (see [Multiplayer](#multiplayer)) and replay completed levels with the extended options (EXTENDED OPTIONS in the main menu, which also holds END GAME; the options are remembered in `config.txt`; off with `--classic`):
 
 <img width="1072" height="864" alt="cheat_options" src="https://github.com/user-attachments/assets/ac6dac4f-fc06-4eba-93f7-c414dfdfd283" />
 
@@ -161,6 +161,35 @@ well: their d-pad/stick moves, in the menus the four face buttons select
 and the others go back, and every button can be bound as above. If a pad
 does not react, `KEEN_PAD_DEBUG=1` prints what it sends.
 
+### Multiplayer
+
+Up to four players, each with his own Keen in the levels. Choose the number
+under EXTENDED OPTIONS > PLAYERS or CONFIGURE > USE GAMEPAD > PLAYERS
+(remembered in `config.txt`); it is set to 2 by itself when two gamepads are
+plugged in at the start. Every player plays with his own gamepad, the first
+one without a gamepad with the keyboard:
+
+| Players | Needs | Player 1 | Player 2 | Player 3 | Player 4 |
+|---|---|---|---|---|---|
+| 2 | 1 gamepad | gamepad 1 | gamepad 2 or keyboard | | |
+| 3 | 2 gamepads | gamepad 1 | gamepad 2 | gamepad 3 or keyboard | |
+| 4 | 3 gamepads | gamepad 1 | gamepad 2 | gamepad 3 | gamepad 4 or keyboard |
+
+- Player 2 wears a blue helmet with red stripes and a green shirt, player 3
+  a yellow helmet with red stripes and a yellow shirt, player 4 a blue
+  helmet with yellow stripes and a red shirt; all of them blue jeans. Each
+  has a score box in his colors.
+- The view follows the leading Keen (player 1). The others are brought back
+  to him when they stay off screen, and come along through his doors.
+- When the leading Keen dies, the next living one takes the lead; the fallen
+  Keen comes back for one of the shared lives (a new game starts with three
+  lives per player).
+- Keys, gems and lives are shared, shots found go to everybody, each Keen
+  keeps his own score. A stunner shot makes another Keen dizzy.
+- On the world map only the leading player walks; the others follow him.
+- Changing the number in the middle of a level applies at once. Not in
+  demos and not with `--classic`.
+
 ### Saves and settings
 
 - **Saved games:** LOAD GAME / SAVE GAME in the control panel, six slots in
@@ -212,7 +241,7 @@ immediately.
 
 The play field can be zoomed out to 75 or 50 percent, which shows more of
 the level in every direction (at 50 % on a 16:9 screen about 852×400 pixels
-instead of 426×200). This helps especially in two player mode. Press `-`
+instead of 426×200). This helps especially in multiplayer mode. Press `-`
 and `+` while playing, or change ZOOM in EXTENDED OPTIONS; the setting is
 remembered in `config.txt`. `--zoom 50` sets it for one session only.
 

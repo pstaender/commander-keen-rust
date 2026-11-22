@@ -107,36 +107,39 @@ runtime and are never committed.
   The help menu's
   hand can point at the HELP! title: `NEW_HELP` in text.rs, the pages about
   this version (keep it current when adding features).
-- Two player mode (`src/game/mp.rs`, CONFIGURE > USE GAMEPAD > TWO
-  PLAYERS, or EXTENDED OPTIONS > TWO PLAYERS; offered when a gamepad is
-  detected, config `twoplayers`; switched in a level it applies at once,
-  `mp_apply_mode`; switched
-  on by itself when two gamepads show up in the first seconds,
-  `Input::two_pads_at_start`, `mp_auto_enable`): a second Keen object in
-  levels (not in demos, not with --classic, needs a gamepad); on the world
-  map only a sprite following Keen 1's path (`mp_world_tick`,
-  `RfState::extra`). The Keen who doesn't lead (Keen 2, or Keen 1
-  after a handover) is drawn behind the leading one and 2 pixels higher
-  (`SpriteSlot::behind`, `ALTYOFFSET`). A new game in two player mode starts with 6 lives.
+- Multiplayer mode, up to 4 players (`src/game/mp.rs`, EXTENDED OPTIONS >
+  PLAYERS or CONFIGURE > USE GAMEPAD > PLAYERS, `mp_next_players`: 1..as
+  many as the pads allow; config `players` (old `twoplayers`); changed in
+  a level it applies at once, `mp_apply_mode`; 2 by itself when two pads
+  show up in the first seconds, `Input::two_pads_at_start`,
+  `mp_auto_enable`). Not in demos, not with --classic, needs a gamepad;
+  `mp_count()` = players actually playing (at most pads + 1). Slots:
+  0 = the leading Keen (`player`, list head, camera), 1-3 = the others
+  (`MpState::slots[k].obj`, their globals in `slots[k].vars`);
+  `MpState::person[slot]` = the player playing it (a permutation, saved;
+  identity until a handover, restored by `mp_unflip` at level setup).
+  `Game::with_slot(k, f)` swaps slot k's globals (`player`, `c`, buttons,
+  `gs.score`/`ammo`/`riding`, `invincible`, ...) in (`mp.cur`), so the
+  ported code runs unchanged for him; the play loop calls the others'
+  think/contact/tiles/react through it. Input: person n = pad n, the
+  first person without a pad = keyboard (`Input::players`,
+  `keyboard_player`, `read_control_of`); on the world map the input is
+  split too, so only the leading player walks; the others are sprites
+  following his path (`mp_world_tick`, `RfState::extra`). When the leader
+  dies, `mp_handover` gives the lead to the first living slot (exchanging
+  the Keen objects' contents, globals, persons). The leader's doors bring
+  the others along. Shots carry `Obj::owner` (person + 1); another
+  player's shot makes Keen dizzy (knocked off the pogo stick; on the
+  ground drawn sitting with Keen 6's stunned sprite, `Gfx::stunned`,
+  which Keen 4/5 borrow from a KEEN6 directory next to theirs). The Keens
+  that don't lead are drawn behind and 2 pixels higher
+  (`SpriteSlot::behind`, `ALTYOFFSET`). Colors per person
+  (`Gfx::alt_sprite(n, idx)`, `ALT_COLORS`, `SpriteSlot::alt`), score
+  boxes per person (`mp_status`). A new game starts with 3 lives per
+  player. Saves get an optional `MP4` trailer (old `MP2` still loads).
   In extended mode the inventory (gems, K5 keycard, K6 special items) is
-  shown at the bottom right, one and two players (`draw_items_box`, extended
-  option SHOW INVENTORY, on by default; on the world map only the K6
-  special items). Player 1 = first pad, player 2 = second pad or keyboard
-  (`Input::split`, `read_control_p2`). `Game::as_p2` swaps player 2's
-  globals (`player`, `c`, buttons, `gs.score`/`ammo`/`riding`,
-  `invincible`, ...) in, so the ported code runs unchanged for him; the
-  play loop calls his think/contact/tiles/react through it. When player 1 dies while
-  player 2 lives, `mp_handover` exchanges the two Keen objects' contents
-  (the first stays `player`, the list head) and their globals;
-  `MpState::flipped` (saved) maps controls, colors and score boxes to the
-  people until the level ends. The leading Keen's doors bring the other
-  one along; the second Keen's doors take only him. Shots carry
-  `Obj::owner`; the other player's shot makes Keen dizzy (knocked off the
-  pogo stick) (on the ground
-  drawn sitting with Keen 6's stunned sprite, `Gfx::stunned`, which Keen
-  4/5 borrow from a KEEN6 directory next to theirs if there is one). Player 2's
-  sprites are recolored (`Gfx::alt_sprite`, `SpriteSlot::alt`); saves get
-  an optional `MP2` trailer.
+  shown at the bottom right (`draw_items_box`, extended option SHOW
+  INVENTORY, on by default; on the world map only the K6 special items).
 - `--classic` (`Options::classic`) switches the additions off: it implies
   `classic_view` and `no_auto_save`, hides MIDI MUSIC and the volume bars
   of the sound/music cards and disables

@@ -21,9 +21,9 @@ pub struct Gfx {
     pub tile8m: Vec<Tex>,
     pub tile16: Vec<Option<Tex>>,
     pub tile16m: Vec<Option<Tex>>,
-    /// two player mode: the sprites in player 2's colors, made when first
-    /// drawn (`alt_sprite`)
-    pub sprites_alt: Vec<Option<Tex>>,
+    /// multiplayer: the sprites in the colors of players 2, 3 and 4, made
+    /// when first drawn (`alt_sprite`)
+    pub sprites_alt: [Vec<Option<Tex>>; 3],
     /// two player mode: Keen 6's sitting, dazed Keen (also borrowed by
     /// Keen 4 and 5 from the Keen 6 files); None until first needed,
     /// Some(None) if not available
@@ -33,39 +33,41 @@ pub struct Gfx {
 /// A sprite drawn instead of an object's own (see `Gfx::stunned`).
 pub struct StunSprite {
     pub tex: Tex,
-    /// in player 2's colors
-    pub alt: Tex,
+    /// in the colors of players 2, 3 and 4
+    pub alt: [Tex; 3],
     /// origin in global units
     pub orgx: i32,
     pub orgy: i32,
 }
 
-/// `tex` in player 2's colors.
-pub fn alt_tex(src: &Tex) -> Tex {
-    Tex { w: src.w, h: src.h, px: src.px.iter().map(|&p| alt_color(p)).collect(), has_alpha: src.has_alpha }
+/// `tex` in the colors of player `n` (2, 3 or 4).
+pub fn alt_tex(src: &Tex, n: usize) -> Tex {
+    let table = ALT_COLORS[n.clamp(2, 4) - 2];
+    Tex { w: src.w, h: src.h, px: src.px.iter().map(|&p| alt_color(p, table)).collect(), has_alpha: src.has_alpha }
 }
 
-/// Player 2's colors: Keen's yellow helmet turns blue with light red
-/// stripes (green before), his pink shirt green and the cyan of his
-/// trousers light blue (next to their dark blue).
+/// The colors of players 2, 3 and 4; all of them wear blue jeans (the cyan
+/// of Keen's trousers turns light blue, next to their dark blue).
+/// Player 2: the yellow helmet blue with light red stripes (green before),
+/// the pink shirt green. Player 3: the helmet yellow with red stripes, a
+/// yellow shirt. Player 4: the helmet blue with yellow stripes, a red
+/// shirt.
 /// (EGA color, replacement) pairs, applied in one pass; a pixel near one
 /// of the EGA colors is moved by the same difference, so the shading of
 /// high resolution packs survives.
-const ALT_COLORS: [(u32, u32); 5] = [
-    (0xffff55, 0x3c3cdc),
-    (0x00aa00, 0xff5555),
-    (0xff55ff, 0x55ff55),
-    (0xaa00aa, 0x00aa00),
-    (0x55ffff, 0x5555ff),
+const ALT_COLORS: [&[(u32, u32)]; 3] = [
+    &[(0xffff55, 0x3c3cdc), (0x00aa00, 0xff5555), (0xff55ff, 0x55ff55), (0xaa00aa, 0x00aa00), (0x55ffff, 0x5555ff)],
+    &[(0x00aa00, 0xff5555), (0xff55ff, 0xffffaa), (0xaa00aa, 0xffff55), (0x55ffff, 0x5555ff)],
+    &[(0xffff55, 0x3c3cdc), (0x00aa00, 0xffff55), (0xff55ff, 0xff5555), (0xaa00aa, 0xaa0000), (0x55ffff, 0x5555ff)],
 ];
 
-fn alt_color(p: u32) -> u32 {
+fn alt_color(p: u32, table: &[(u32, u32)]) -> u32 {
     if p >> 24 == 0 {
         return p;
     }
     let ch = |c: u32, s: u32| ((c >> s) & 0xff) as i32;
     let mut best: Option<(i32, u32, u32)> = None;
-    for &(from, to) in &ALT_COLORS {
+    for &(from, to) in table {
         let d: i32 = [16, 8, 0].iter().map(|&s| (ch(p, s) - ch(from, s)).pow(2)).sum();
         if d < 48 * 48 && best.is_none_or(|b| d < b.0) {
             best = Some((d, from, to));
@@ -80,13 +82,14 @@ fn alt_color(p: u32) -> u32 {
 }
 
 impl Gfx {
-    /// Sprite `idx` in player 2's colors.
-    pub fn alt_sprite(&mut self, idx: usize) -> &Tex {
-        if self.sprites_alt.len() < self.sprites.len() {
-            self.sprites_alt.resize(self.sprites.len(), None);
+    /// Sprite `idx` in the colors of player `n` (2, 3 or 4).
+    pub fn alt_sprite(&mut self, n: usize, idx: usize) -> &Tex {
+        let v = n.clamp(2, 4) - 2;
+        if self.sprites_alt[v].len() < self.sprites.len() {
+            self.sprites_alt[v].resize(self.sprites.len(), None);
         }
         let src = &self.sprites[idx];
-        self.sprites_alt[idx].get_or_insert_with(|| alt_tex(src))
+        self.sprites_alt[v][idx].get_or_insert_with(|| alt_tex(src, n))
     }
 }
 
@@ -151,7 +154,7 @@ impl Gfx {
                 .enumerate()
                 .map(|(i, s)| s.as_ref().map(|s| conv(s, format!("tiles/tile16m/{:04}.png", i))))
                 .collect(),
-            sprites_alt: Vec::new(),
+            sprites_alt: Default::default(),
             stunned: None,
         }
     }

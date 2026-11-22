@@ -364,7 +364,7 @@ fn build_cards() -> Vec<Card> {
                 b(0x1e, "UNLIMITED AMMO", 0),
                 b(0x17, "SHOW INVENTORY", 0),
                 b(0x2c, "ZOOM", 0),
-                b(0x14, "TWO PLAYERS", 0),
+                b(0x19, "PLAYERS", 0),
                 b(0x12, "END GAME", 2),
             ],
             Custom::Cheat,
@@ -380,7 +380,7 @@ fn build_cards() -> Vec<Card> {
                 f(0x30, "CONFIGURE BUTTONS", PADBUTTONSCARD),
                 item(UII_BUTTON, UI_SEPARATED, 0x20, "DEFAULT LAYOUT", 0, None),
                 // removed with --classic
-                item(UII_BUTTON, UI_SEPARATED, 0x14, "TWO PLAYERS (OFF)", 0, None),
+                item(UII_BUTTON, UI_SEPARATED, 0x19, "PLAYERS (1)", 0, None),
             ],
             Custom::Pad,
             0,
@@ -690,11 +690,24 @@ struct LoadedGame {
     scoreobj: usize,
     /// two player mode (not in older saves): player 2's object, score,
     /// next extra life, shots, out of lives
-    mp: Option<(Option<usize>, i32, i32, i32, bool, bool)>,
+    mp: Option<MpSave>,
+}
+
+/// The multiplayer part of a saved game: per slot (1-3) the Keen object,
+/// score, next extra life, shots and whether he is out; the player of each
+/// slot.
+struct MpSave {
+    objs: [Option<usize>; 4],
+    vars: [(i32, i32, i32); 4],
+    out: [bool; 4],
+    person: [usize; 4],
 }
 
 /// marks the two player part at the end of a saved game
+/// two player saves of 0.3.4 and older
 const MPMAGIC: &[u8; 4] = b"MP2\0";
+/// multiplayer saves (up to 4 players)
+const MPMAGIC4: &[u8; 4] = b"MP4\0";
 
 impl Game {
     // ---- small helpers ------------------------------------------------------
@@ -1134,9 +1147,9 @@ impl Game {
         if two {
             fire.flags |= UI_DISABLED;
         }
-        let mp = self.mp.enabled;
+        let n = self.mp.players.clamp(1, 4);
         if let Some(it) = self.menu.cards[PADCARD].items.get_mut(PAD_TWOPLAYERS_ITEM) {
-            it.text = if mp { "TWO PLAYERS (ON)" } else { "TWO PLAYERS (OFF)" };
+            it.text = ["PLAYERS (1)", "PLAYERS (2)", "PLAYERS (3)", "PLAYERS (4)"][n - 1];
         }
     }
 
@@ -1323,19 +1336,22 @@ impl Game {
                 self.usl_draw_ctl_panel();
                 true
             }
-            // two player mode (in a level at once when the game goes on,
+            // multiplayer mode (in a level at once when the game goes on,
             // `mp_apply_mode`)
             UIC_HIT if i == Some(PAD_TWOPLAYERS_ITEM) => {
-                self.mp.enabled = !self.mp.enabled;
+                self.mp_next_players();
                 self.usl_set_options_text();
-                let s2 = if !self.mp.enabled {
-                    "One player"
-                } else if self.sys.input.pad_count >= 2 {
-                    "Player 2: second gamepad"
+                let n = self.mp.players;
+                let pads = self.sys.input.pad_count.max(1);
+                let s1 = ["One player", "Two players", "Three players", "Four players"][n.clamp(1, 4) - 1];
+                let s2 = if n < 2 {
+                    String::new()
+                } else if pads < n {
+                    format!("Player {}: keyboard", pads + 1)
                 } else {
-                    "Player 2: keyboard"
+                    "Each player: a gamepad".to_string()
                 };
-                self.usl_ctl_dialog(if self.mp.enabled { "Two players on" } else { "Two players off" }, s2, Some("Press any key"));
+                self.usl_ctl_dialog(s1, &s2, Some("Press any key"));
                 self.usl_draw_ctl_panel();
                 true
             }
@@ -1532,7 +1548,7 @@ impl Game {
                         it.flags |= UI_DISABLED;
                     }
                 }
-                // two player mode needs a gamepad (player 1's)
+                // multiplayer mode needs a gamepad (player 1's)
                 let it = &mut self.menu.cards[CHEATCARD].items[CHEAT_TWOPLAYERS_ITEM];
                 if self.sys.input.pad_connected {
                     it.flags &= !UI_DISABLED;
@@ -1555,7 +1571,7 @@ impl Game {
                     4 => format!("UNLIMITED AMMO [{}]", if self.opts.unlimited_ammo { "X" } else { " " }),
                     5 => format!("SHOW INVENTORY [{}]", if self.opts.hide_inventory { " " } else { "X" }),
                     6 => format!("ZOOM [{}%]", self.zoom()),
-                    7 => format!("TWO PLAYERS [{}]", if self.mp.enabled { "X" } else { " " }),
+                    7 => format!("PLAYERS [{}]", self.mp.players.clamp(1, 4)),
                     _ => return false,
                 };
                 self.usl_draw_item_text(i, &text);
@@ -1578,10 +1594,11 @@ impl Game {
                         self.opts.zoom = zs[(i + 1) % zs.len()];
                         self.opts.zoom_given = false;
                     }
-                    // two player mode (at once when the game goes on), the same
-                    // switch as in CONFIGURE > USE GAMEPAD
+                    // multiplayer mode (at once when the game goes on), the
+                    // same as in CONFIGURE > USE GAMEPAD: 1, 2, ... as many
+                    // as the gamepads allow, 1
                     7 => {
-                        self.mp.enabled = !self.mp.enabled;
+                        self.mp_next_players();
                         self.usl_set_options_text();
                     }
                     _ => {
@@ -2666,16 +2683,21 @@ impl Game {
         w.i32(self.objectcount);
         w.i32(self.player as i32);
         w.i32(self.scoreobj as i32);
-        // two player mode: player 2 (older versions ignore the rest)
-        if self.mp_in_level() || self.mp.out {
-            w.0.extend_from_slice(MPMAGIC);
-            w.opt(self.mp.p2);
-            let o = &self.mp.other;
-            for v in [o.score, o.nextextra, o.ammo] {
-                w.i32(v);
+        // multiplayer mode: the other players (older versions ignore the
+        // rest)
+        if self.mp_in_level() || self.mp.slots.iter().any(|s| s.out) || self.mp.flipped() {
+            w.0.extend_from_slice(MPMAGIC4);
+            for k in 1..4 {
+                let s = &self.mp.slots[k];
+                w.opt(s.obj);
+                for v in [s.vars.score, s.vars.nextextra, s.vars.ammo] {
+                    w.i32(v);
+                }
+                w.bool(s.out);
             }
-            w.bool(self.mp.out);
-            w.bool(self.mp.flipped);
+            for k in 0..4 {
+                w.u16(self.mp.person[k] as u16);
+            }
         }
         if let Some(d) = path.parent() {
             std::fs::create_dir_all(d).map_err(|e| io_error_text(&e))?;
@@ -2752,15 +2774,38 @@ impl Game {
         let objectcount = r.i32()?;
         let player = r.opt(count)?.ok_or_else(|| "Bad saved game".to_string())?;
         let scoreobj = r.opt(count)?.ok_or_else(|| "Bad saved game".to_string())?;
-        let mp = if d.get(r.pos..r.pos + MPMAGIC.len()) == Some(&MPMAGIC[..]) {
+        let mut mp = None;
+        if d.get(r.pos..r.pos + MPMAGIC4.len()) == Some(&MPMAGIC4[..]) {
+            r.pos += MPMAGIC4.len();
+            let mut m = MpSave { objs: [None; 4], vars: [(0, 20000, 5); 4], out: [false; 4], person: [0, 1, 2, 3] };
+            for k in 1..4 {
+                m.objs[k] = r.opt(count)?;
+                m.vars[k] = (r.i32()?, r.i32()?, r.i32()?);
+                m.out[k] = r.bool()?;
+            }
+            for k in 0..4 {
+                m.person[k] = r.u16()? as usize;
+            }
+            // (a permutation of the players, else as if nobody took the lead)
+            let mut seen = [false; 4];
+            if m.person.iter().any(|&p| p >= 4 || std::mem::replace(&mut seen[p], true)) {
+                m.person = [0, 1, 2, 3];
+            }
+            mp = Some(m);
+        } else if d.get(r.pos..r.pos + MPMAGIC.len()) == Some(&MPMAGIC[..]) {
             r.pos += MPMAGIC.len();
             let (ob, score, nextextra, ammo, out) = (r.opt(count)?, r.i32()?, r.i32()?, r.i32()?, r.bool()?);
             // (player 2 leading: not in saves of 0.3.2 and older)
             let flipped = if r.pos < d.len() { r.bool()? } else { false };
-            Some((ob, score, nextextra, ammo, out, flipped))
-        } else {
-            None
-        };
+            let mut m = MpSave { objs: [None; 4], vars: [(0, 20000, 5); 4], out: [false; 4], person: [0, 1, 2, 3] };
+            m.objs[1] = ob;
+            m.vars[1] = (score, nextextra, ammo);
+            m.out[1] = out;
+            if flipped {
+                m.person = [1, 0, 2, 3];
+            }
+            mp = Some(m);
+        }
         Ok(LoadedGame { gs, mapwidth, mapheight, planes, objs, obj_free, objfreelist, lastobj, objectcount, player, scoreobj, mp })
     }
 
@@ -2833,20 +2878,20 @@ impl Game {
         s.temp2 = -1;
         s.temp3 = -1;
         s.temp4 = -1;
-        // two player mode: player 2's part (a new player 2 for saves
+        // multiplayer mode: the other players' part (new players for saves
         // without it)
         self.mp_new_game();
-        let mut p2 = None;
-        if let Some((ob, score, nextextra, ammo, out, flipped)) = l.mp {
-            let o = &mut self.mp.other;
-            o.score = score;
-            o.nextextra = nextextra;
-            o.ammo = ammo;
-            self.mp.out = out;
-            self.mp.flipped = flipped;
-            p2 = ob;
+        let mut objs = [None; 4];
+        if let Some(m) = l.mp {
+            for k in 1..4 {
+                let v = &mut self.mp.slots[k].vars;
+                (v.score, v.nextextra, v.ammo) = m.vars[k];
+                self.mp.slots[k].out = m.out[k];
+            }
+            self.mp.person = m.person;
+            objs = m.objs;
         }
-        self.mp_after_load(p2);
+        self.mp_after_load(objs);
         self.rf_new_map();
         self.rf_mark_tile_graphics_public();
         let p = self.player;
@@ -3075,7 +3120,9 @@ impl Game {
                 "compatibility" => self.menu.compatibility = n == 1,
                 "jerk" => self.menu.jerk = n == 1,
                 "twobutton" => self.twobutton = n == 1,
-                "twoplayers" => self.mp.enabled = n == 1,
+                // (twoplayers: before 3 and 4 players)
+                "twoplayers" if n == 1 && self.mp.players < 2 => self.mp.players = 2,
+                "players" if (1..=4).contains(&n) => self.mp.players = n as usize,
                 "unlimitedlives" => self.opts.unlimited_lives = n == 1,
                 "unlimitedammo" => self.opts.unlimited_ammo = n == 1,
                 "allowreenter" => self.opts.allow_reenter = n == 1,
@@ -3150,7 +3197,7 @@ impl Game {
         if super::EPISODE == 5 {
             text += &format!("jerk={}\n", b(self.menu.jerk));
         }
-        text += &format!("twoplayers={}\n", b(self.mp.enabled));
+        text += &format!("players={}\n", self.mp.players.clamp(1, 4));
         text += &format!(
             "unlimitedlives={}\nunlimitedammo={}\nallowreenter={}\nshowinventory={}\nzoom={}\n",
             b(self.opts.unlimited_lives),

@@ -192,24 +192,31 @@ impl Game {
         }
     }
 
-    /// PollControls (0x18413); in two player mode for both players.
+    /// PollControls (0x18413); in multiplayer mode for every Keen, each
+    /// with the controls of his player.
     pub fn poll_controls(&mut self) {
         let c = self.read_control();
         let i = &self.sys.input;
-        // (two player mode: the keyboard may belong to player 2)
-        let fire = (!i.keyboard_is_p2() && i.key(self.firescan)) || i.pad_fire;
-        if self.mp.p2.is_none() && !self.mp.flipped {
+        // (multiplayer: the keyboard may belong to another player)
+        let fire = (i.keyboard_player() == 0 && i.key(self.firescan)) || i.pad_fire;
+        let extra = self.mp_extra_objs();
+        if extra.is_empty() && !self.mp.flipped() {
             self.apply_controls(c, fire);
             return;
         }
-        let i = &self.sys.input;
-        let c2 = i.read_control_p2();
-        let fire2 = if i.pad_count < 2 { i.key(self.firescan) } else { i.pad2_fire };
-        // (player 2 took the lead: he plays the first Keen)
-        let (lead, second) = if self.mp.flipped { ((c2, fire2), (c, fire)) } else { ((c, fire), (c2, fire2)) };
+        let ctl = |g: &Game, n: usize| {
+            let i = &g.sys.input;
+            if n == 0 {
+                return (c, fire);
+            }
+            (i.read_control_of(n), (i.keyboard_player() == n && i.key(g.firescan)) || i.pad_fire_of(n))
+        };
+        // (each Keen with the controls of the player playing him)
+        let lead = ctl(self, self.mp.person[0]);
         self.apply_controls(lead.0, lead.1);
-        if self.mp.p2.is_some() {
-            self.as_p2(|g| g.apply_controls(second.0, second.1));
+        for (k, _) in extra {
+            let (ck, fk) = ctl(self, self.mp.person[k]);
+            self.with_slot(k, |g| g.apply_controls(ck, fk));
         }
     }
 
@@ -836,7 +843,7 @@ impl Game {
         self.fireheld = false;
         self.inlevel = true;
         self.playstate = EX_STILLPLAYING;
-        self.sys.input.split = self.mp_in_level() || self.mp.flipped;
+        self.mp_split_input();
         self.pogodelay = 0;
         self.scrolllock = false;
         self.invincible = 0;
@@ -851,6 +858,9 @@ impl Game {
                 self.playstate = EX_ABORTGAME;
                 break;
             }
+            // (multiplayer: the number of players may have changed in the
+            // control panel)
+            self.mp_split_input();
             self.poll_controls();
             // activate / move objects
             let mut cur = Some(self.player);
@@ -889,8 +899,8 @@ impl Game {
                             }
                         }
                     }
-                    if Some(ob) == self.mp.p2 {
-                        self.as_p2(|g| g.state_machine(ob));
+                    if let Some(k) = self.mp_extra_slot(ob) {
+                        self.with_slot(k, |g| g.state_machine(ob));
                     } else {
                         self.state_machine(ob);
                     }
@@ -904,8 +914,8 @@ impl Game {
                 let p = self.player;
                 self.handle_riding(p);
             }
-            if let Some(p2) = self.mp.p2 {
-                self.as_p2(|g| g.handle_riding(p2));
+            for (k, o) in self.mp_extra_objs() {
+                self.with_slot(k, |g| g.handle_riding(o));
             }
             // contacts
             let mut cur = Some(self.player);
@@ -941,16 +951,16 @@ impl Game {
                 self.check_world_in_tiles(p);
             } else {
                 self.check_in_tiles(p);
-                if let Some(p2) = self.mp.p2 {
-                    self.as_p2(|g| g.check_in_tiles(p2));
+                for (k, o) in self.mp_extra_objs() {
+                    self.with_slot(k, |g| g.check_in_tiles(o));
                 }
             }
             // reactions
             let mut cur = Some(self.player);
             while let Some(ob) = cur {
                 let nx = self.objs[ob].next;
-                if Some(ob) == self.mp.p2 {
-                    self.mp_react_p2(ob);
+                if let Some(k) = self.mp_extra_slot(ob) {
+                    self.mp_react_extra(k, ob);
                     cur = self.objs[ob].next;
                     continue;
                 }
@@ -1026,7 +1036,7 @@ impl Game {
             }
         }
         self.inlevel = false;
-        self.sys.input.split = false;
+        self.sys.input.players = 0;
         self.stop_music();
     }
 

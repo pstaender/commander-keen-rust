@@ -422,6 +422,16 @@ pub fn default_pad_map() -> [PadInput; PAD_ACTIONS] {
     [B(13), B(14), B(15), B(16), B(0), B(1), B(2), B(9), B(4), B(6)]
 }
 
+/// The game controls of one gamepad.
+#[derive(Clone, Copy, Default)]
+pub struct PadControl {
+    pub x: i32,
+    pub y: i32,
+    pub jump: bool,
+    pub pogo: bool,
+    pub fire: bool,
+}
+
 pub struct Input {
     /// gamepad state (merged into the keyboard controls)
     pub pad_x: i32,
@@ -436,15 +446,14 @@ pub struct Input {
     /// two gamepads were found at launch (in the first seconds): two player
     /// mode is switched on (consumed by the game, `Game::mp_auto_enable`)
     pub two_pads_at_start: bool,
-    /// two player mode (not in the original): the first gamepad plays
-    /// Keen, the second one (`pad2_*`), or the keyboard if there is only one
-    /// gamepad, the second Keen. Set by the game while a level runs.
-    pub split: bool,
-    pub pad2_x: i32,
-    pub pad2_y: i32,
-    pub pad2_jump: bool,
-    pub pad2_pogo: bool,
-    pub pad2_fire: bool,
+    /// multiplayer (not in the original): the number of players the
+    /// controls are split between (0 or 1: not split, all gamepads and the
+    /// keyboard play Keen). Player n plays with gamepad n (`pads`, player
+    /// 1's is also `pad_x`...), the first player without one with the
+    /// keyboard (`keyboard_player`). Set by the game.
+    pub players: usize,
+    /// multiplayer: the controls of each gamepad (in connection order)
+    pub pads: [PadControl; 4],
     /// gamepad bindings, indexed by PAD_UP..PAD_LOADSTATE
     pub pad_map: [PadInput; PAD_ACTIONS],
     /// the save / load state actions were pressed (consumed by the game)
@@ -481,12 +490,8 @@ impl Default for Input {
             pad_connected: false,
             pad_count: 0,
             two_pads_at_start: false,
-            split: false,
-            pad2_x: 0,
-            pad2_y: 0,
-            pad2_jump: false,
-            pad2_pogo: false,
-            pad2_fire: false,
+            players: 0,
+            pads: [PadControl::default(); 4],
             pad_map: default_pad_map(),
             pad_save: false,
             pad_load: false,
@@ -514,25 +519,44 @@ impl Input {
         self.last_ascii = 0;
     }
 
-    /// In two player mode the keyboard belongs to the second player.
-    pub fn keyboard_is_p2(&self) -> bool {
-        self.split && self.pad_count < 2
+    /// Multiplayer: the player (0 = the first) who plays with the
+    /// keyboard: the first one without a gamepad (player 1, also with his
+    /// gamepad, if every player has one).
+    pub fn keyboard_player(&self) -> usize {
+        // (a gamepad connected counts as one even before it is counted)
+        let pads = if self.pad_connected { self.pad_count.max(1) } else { self.pad_count };
+        if self.players >= 2 && pads < self.players {
+            pads
+        } else {
+            0
+        }
     }
 
     /// Reads the keyboard control scheme (IN_ReadControl, keyboard part).
-    /// In two player mode: the first player's controls (see `split`).
+    /// In multiplayer mode: the first player's controls (see `players`).
     pub fn read_control(&self) -> ControlInfo {
-        let keys = !self.keyboard_is_p2();
+        let keys = self.keyboard_player() == 0;
         self.control_from(keys, self.pad_x, self.pad_y, self.pad_jump, self.pad_pogo)
     }
 
-    /// Two player mode: the second player's controls (second gamepad, or
-    /// the keyboard if there is only one gamepad).
-    pub fn read_control_p2(&self) -> ControlInfo {
-        if self.pad_count < 2 {
-            self.control_from(true, 0, 0, false, false)
+    /// Multiplayer: the controls of player `n` (0 = the first): his
+    /// gamepad and/or the keyboard.
+    pub fn read_control_of(&self, n: usize) -> ControlInfo {
+        if n == 0 {
+            return self.read_control();
+        }
+        let keys = self.keyboard_player() == n;
+        let p = if n < self.pad_count { self.pads[n] } else { PadControl::default() };
+        self.control_from(keys, p.x, p.y, p.jump, p.pogo)
+    }
+
+    /// Multiplayer: player `n`'s fire button on his gamepad (the
+    /// keyboard's fire key is the game's `firescan`).
+    pub fn pad_fire_of(&self, n: usize) -> bool {
+        if n == 0 {
+            self.pad_fire
         } else {
-            self.control_from(false, self.pad2_x, self.pad2_y, self.pad2_jump, self.pad2_pogo)
+            n < self.pad_count && self.pads[n].fire
         }
     }
 
