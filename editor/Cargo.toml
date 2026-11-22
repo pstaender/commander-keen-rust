@@ -1,6 +1,6 @@
 [package]
 name = "keen-editor"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Commander Keen Editor: level and world map editor for the Keen 4-6 reimplementation"
 
