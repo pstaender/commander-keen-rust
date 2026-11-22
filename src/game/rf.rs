@@ -87,6 +87,8 @@ pub struct SpriteSlot {
     pub white: bool,
     /// two player mode: player 2's colors (not in the original)
     pub alt: bool,
+    /// two player mode: a dizzy Keen, drawn sitting (`Gfx::stunned`)
+    pub stunned: bool,
 }
 
 /// One animation group (allanims entry).
@@ -539,7 +541,7 @@ impl Game {
         // (two player mode: Keen 2 is drawn 2 pixels higher, so the Keens
         // never cover each other completely)
         let y = if alt { y - super::mp::ALTYOFFSET } else { y };
-        self.rf.sprites[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false, alt };
+        self.rf.sprites[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false, alt, stunned: false };
         self.objs[ob].sprite = true;
     }
 
@@ -551,7 +553,7 @@ impl Game {
             self.rf.order += 1;
             -self.rf.order
         };
-        self.rf.stars[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false, alt: false };
+        self.rf.stars[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false, alt: false, stunned: false };
     }
 
     /// Switches the placed sprite of `ob` to white (maskdraw) drawing.
@@ -580,6 +582,18 @@ impl Game {
     // ---- drawing ----------------------------------------------------------
 
     fn draw_sprite_slot(&mut self, s: SpriteSlot) {
+        if s.stunned {
+            if let Some(Some(st)) = &self.gfx.stunned {
+                let scale = self.sys.surface.scale as i32;
+                let gpx = ((s.x + st.orgx) as u16 as i32) >> 4;
+                let gpy = ((s.y + st.orgy) as u16 as i32) >> 4;
+                let px = (gpx - (self.cam.originxglobal >> 4)) as i16 as i32;
+                let py = (gpy - (self.cam.originyglobal >> 4)) as i16 as i32;
+                let tex = if s.alt { &st.alt } else { &st.tex };
+                self.sys.surface.blit_phys(tex, px * scale, py * scale);
+                return;
+            }
+        }
         let idx = s.shape - STARTSPRITES as i32;
         if idx < 0 || idx as usize >= self.gfx.sprites.len() {
             return;

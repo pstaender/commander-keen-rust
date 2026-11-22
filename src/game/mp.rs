@@ -435,7 +435,9 @@ impl Game {
             let Some(ob) = ob else { continue };
             if self.mp.dizzy[n] > 0 {
                 self.mp.dizzy[n] = (self.mp.dizzy[n] - tics).max(0);
-                let (x, y) = (self.objs[ob].x - 0x20, self.objs[ob].y - 0x90);
+                // on the ground he sits dazed, the stars lower
+                let down = if self.mp_sit_dizzy(ob) { 0x80 } else { 0 };
+                let (x, y) = (self.objs[ob].x - 0x20, self.objs[ob].y - 0x90 + down);
                 self.place_stars(ob, x, y, super::ep::STARSPR + frame, 3);
             } else {
                 self.remove_stars(ob);
@@ -512,8 +514,66 @@ impl Game {
             order: p1.order - 1,
             white: false,
             alt: true,
+            stunned: false,
         };
         self.rf.extra = vec![slot];
+    }
+
+    /// A dizzy Keen standing on the ground (or idling: the idle
+    /// animations start over) sits dazed: Keen 6's stunned Keen sprite
+    /// (Keen 4 and 5 borrow it from the Keen 6 files if they are there).
+    fn mp_sit_dizzy(&mut self, ob: usize) -> bool {
+        use super::keen::{keen_pause_think, keen_read_think, keen_stand_think};
+        let Some(st) = self.objs[ob].state else { return false };
+        let idle = st.think.is_some_and(|t| {
+            [keen_pause_think as ThinkFn, keen_stand_think, keen_read_think].iter().any(|&f| std::ptr::fn_addr_eq(t, f))
+        });
+        if !idle || self.objs[ob].hitnorth == 0 || !self.mp_load_stunned() {
+            return false;
+        }
+        if !std::ptr::eq(st, &S_KEENSTAND) {
+            self.change_state(ob, &S_KEENSTAND);
+        }
+        if let Some(s) = self.rf.sprites.get_mut(ob) {
+            s.stunned = true;
+        }
+        true
+    }
+
+    /// Makes `Gfx::stunned` (once): Keen 6's own sprite, or for Keen 4
+    /// and 5 the one of the Keen 6 files in a KEEN6 / Keen6 / keen6
+    /// directory next to the data directory. False if there is none.
+    fn mp_load_stunned(&mut self) -> bool {
+        use crate::engine::gfx::{alt_tex, StunSprite};
+        use crate::engine::video::Tex;
+        if let Some(s) = &self.gfx.stunned {
+            return s.is_some();
+        }
+        let idx = (crate::ck6::states::S_KEENSTUNNED.left - crate::ck6::consts::STARTSPRITES as i32) as usize;
+        let scale = self.gfx.scale;
+        let found = if super::EPISODE == 6 {
+            let t = &self.gfx.sprites[idx];
+            let info = self.data.gfx.spritetable[idx];
+            let tex = Tex { w: t.w, h: t.h, px: t.px.clone(), has_alpha: t.has_alpha };
+            Some((tex, info))
+        } else {
+            let base = self.data.dir.parent().map(|p| p.to_path_buf()).unwrap_or_default();
+            ["KEEN6", "Keen6", "keen6"].iter().find_map(|n| {
+                let d = crate::assets::GameData::load(&base.join(n)).ok()?;
+                if d.episode != crate::assets::Episode::K6 {
+                    return None;
+                }
+                let img = d.gfx.sprites.get(idx)?;
+                Some((Tex::from_image(img, scale), *d.gfx.spritetable.get(idx)?))
+            })
+        };
+        self.gfx.stunned = Some(found.map(|(tex, info)| StunSprite {
+            alt: alt_tex(&tex),
+            tex,
+            orgx: info.orgx as i32,
+            orgy: info.orgy as i32,
+        }));
+        self.gfx.stunned.as_ref().is_some_and(|s| s.is_some())
     }
 
     /// Player 2's score, shots and lives for the score box: None if he

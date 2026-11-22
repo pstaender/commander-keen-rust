@@ -24,6 +24,25 @@ pub struct Gfx {
     /// two player mode: the sprites in player 2's colors, made when first
     /// drawn (`alt_sprite`)
     pub sprites_alt: Vec<Option<Tex>>,
+    /// two player mode: Keen 6's sitting, dazed Keen (also borrowed by
+    /// Keen 4 and 5 from the Keen 6 files); None until first needed,
+    /// Some(None) if not available
+    pub stunned: Option<Option<StunSprite>>,
+}
+
+/// A sprite drawn instead of an object's own (see `Gfx::stunned`).
+pub struct StunSprite {
+    pub tex: Tex,
+    /// in player 2's colors
+    pub alt: Tex,
+    /// origin in global units
+    pub orgx: i32,
+    pub orgy: i32,
+}
+
+/// `tex` in player 2's colors.
+pub fn alt_tex(src: &Tex) -> Tex {
+    Tex { w: src.w, h: src.h, px: src.px.iter().map(|&p| alt_color(p)).collect(), has_alpha: src.has_alpha }
 }
 
 /// Player 2's colors: Keen's yellow helmet turns blue with light red
@@ -32,7 +51,7 @@ pub struct Gfx {
 /// of the EGA colors is moved by the same difference, so the shading of
 /// high resolution packs survives.
 const ALT_COLORS: [(u32, u32); 5] = [
-    (0xffff55, 0x5555ff),
+    (0xffff55, 0x3c3cdc),
     (0x00aa00, 0xff5555),
     (0xff55ff, 0x55ff55),
     (0xaa00aa, 0x00aa00),
@@ -66,12 +85,7 @@ impl Gfx {
             self.sprites_alt.resize(self.sprites.len(), None);
         }
         let src = &self.sprites[idx];
-        self.sprites_alt[idx].get_or_insert_with(|| Tex {
-            w: src.w,
-            h: src.h,
-            px: src.px.iter().map(|&p| alt_color(p)).collect(),
-            has_alpha: src.has_alpha,
-        })
+        self.sprites_alt[idx].get_or_insert_with(|| alt_tex(src))
     }
 }
 
@@ -137,6 +151,7 @@ impl Gfx {
                 .map(|(i, s)| s.as_ref().map(|s| conv(s, format!("tiles/tile16m/{:04}.png", i))))
                 .collect(),
             sprites_alt: Vec::new(),
+            stunned: None,
         }
     }
 }

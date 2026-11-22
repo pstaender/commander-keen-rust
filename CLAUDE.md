@@ -100,7 +100,9 @@ runtime and are never committed.
   globals (`player`, `c`, buttons, `gs.score`/`ammo`/`riding`,
   `invincible`, ...) in, so the ported code runs unchanged for him; the
   play loop calls his think/contact/tiles/react through it. Shots carry
-  `Obj::owner`; the other player's shot makes Keen dizzy. Player 2's
+  `Obj::owner`; the other player's shot makes Keen dizzy (on the ground
+  drawn sitting with Keen 6's stunned sprite, `Gfx::stunned`, which Keen
+  4/5 borrow from a KEEN6 directory next to theirs if there is one). Player 2's
   sprites are recolored (`Gfx::alt_sprite`, `SpriteSlot::alt`); saves get
   an optional `MP2` trailer.
 - `--classic` (`Options::classic`) switches the additions off: it implies
