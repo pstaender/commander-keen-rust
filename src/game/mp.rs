@@ -98,8 +98,6 @@ pub struct MpState {
     /// the camera follows him) is played by player 2, the second Keen by
     /// player 1 (until the level ends)
     pub flipped: bool,
-    /// the second Keen went through a door: he takes the lead
-    pub door_lead: bool,
 }
 
 impl Game {
@@ -193,9 +191,8 @@ impl Game {
         }
     }
 
-    /// Player 1 died (or, with `force`: fell out of the map, or player 2
-    /// went through a door) while player 2 is alive: player 2 takes the
-    /// lead. The two Keen objects exchange
+    /// Player 1 died (or fell out of the map with `force`) while player 2
+    /// is alive: player 2 takes the lead. The two Keen objects exchange
     /// everything but their place in the object list (the first one stays
     /// `player`, which the original code relies on), the per player
     /// globals, dizziness and the owners of the flying shots. True if done.
@@ -340,7 +337,6 @@ impl Game {
     /// Keen 4's underwater level).
     pub fn mp_setup_level(&mut self) {
         self.mp_auto_enable();
-        self.mp.door_lead = false;
         self.mp_unflip();
         self.mp.p2 = None;
         self.mp.respawn = 0;
@@ -434,7 +430,8 @@ impl Game {
         }
     }
 
-    /// Brings player 2 back to player 1 (falling, so he lands safely).
+    /// Brings player 2 back to player 1 (falling, so he lands safely):
+    /// when he was off screen too long, and through player 1's doors.
     fn mp_warp_p2(&mut self, p2: usize) {
         let p = self.objs[self.player].clone();
         self.as_p2(|g| {
@@ -443,22 +440,25 @@ impl Game {
             o.y = p.y;
             o.xspeed = 0;
             o.yspeed = 0;
-            o.needtoclip = CL_MIDCLIP;
             o.priority = 1;
             g.gs.riding = None;
             g.jumptime = 0;
+            // without clipping, like KeenEnterThink: ChangeState clips the
+            // move from the old position, which would stop him on the
+            // first floor between there and player 1
+            g.objs[p2].needtoclip = CL_NOCLIP;
             g.change_state(p2, &S_KEENFALL1);
+            g.objs[p2].needtoclip = CL_MIDCLIP;
         });
         self.mp.away = 0;
     }
 
-    /// A Keen went through a door (KeenEnterThink): the other one comes
-    /// along. The one who went through leads (the camera follows him): for
-    /// the second Keen the lead changes at the end of the frame
-    /// (`mp_tick`, outside `as_p2`).
+    /// The leading Keen went through a door (KeenEnterThink, also to
+    /// another spot of the same map): the other one comes along. (The
+    /// second Keen's doors take only him; when he stays off screen he is
+    /// brought back.)
     pub fn mp_follow_door(&mut self) {
         if self.mp.swapped {
-            self.mp.door_lead = true;
             return;
         }
         if let Some(p2) = self.mp.p2 {
@@ -498,14 +498,6 @@ impl Game {
         // player 1 dies: player 2 goes on
         if self.mp.p2.is_some() && !self.mp.swapped && self.keen_dying() {
             self.mp_handover(false);
-        }
-        // the second Keen went through a door: he leads, the other follows
-        if std::mem::take(&mut self.mp.door_lead) && !self.keen_dying() && self.mp_handover(true) {
-            if let Some(p2) = self.mp.p2 {
-                self.mp_warp_p2(p2);
-            }
-            let p = self.player;
-            self.center_actor(p);
         }
         if !self.mp_in_level() {
             return;
@@ -559,7 +551,7 @@ impl Game {
                 self.mp_knock_off_pogo(n, ob);
                 // on the ground he sits dazed, the stars lower
                 let down = if self.mp_sit_dizzy(ob) { 0x80 } else { 0 };
-                let (x, y) = (self.objs[ob].x, self.objs[ob].y - 0x90 + down);
+                let (x, y) = (self.objs[ob].x + 0x20, self.objs[ob].y - 0x90 + down);
                 self.place_stars(ob, x, y, super::ep::STARSPR + frame, 3);
             } else {
                 self.remove_stars(ob);
@@ -665,11 +657,11 @@ impl Game {
     /// animations start over) sits dazed: Keen 6's stunned Keen sprite
     /// (Keen 4 and 5 borrow it from the Keen 6 files if they are there).
     fn mp_sit_dizzy(&mut self, ob: usize) -> bool {
-        use super::keen::{keen_pause_think, keen_read_think, keen_stand_think};
         let Some(st) = self.objs[ob].state else { return false };
-        let idle = st.think.is_some_and(|t| {
-            [keen_pause_think as ThinkFn, keen_stand_think, keen_read_think].iter().any(|&f| std::ptr::fn_addr_eq(t, f))
-        });
+        // standing or any of the idle animations (looking around, waiting,
+        // sitting down, reading, Keen 4's mooning; they differ per episode)
+        let idle = st.name == "s_keenstand"
+            || ["s_keenpause", "s_keenwait", "s_keensit", "s_keenread", "s_keenmoon"].iter().any(|p| st.name.starts_with(p));
         if !idle || self.objs[ob].hitnorth == 0 || !self.mp_load_stunned() {
             return false;
         }
@@ -953,37 +945,71 @@ mod tests {
     }
 
     #[test]
-    fn doors_bring_the_other_keen_along() {
+    fn the_other_keen_follows_the_leaders_door() {
         let tmp = std::env::temp_dir().join(format!("keen-mp-door-{}-{}", super::super::EPISODE, std::process::id()));
         let _ = std::fs::create_dir_all(&tmp);
         let Some(mut g) = two_player_game(&tmp) else { return };
         let (p1, p2) = (g.player, g.mp.p2.unwrap());
-        // player 2 went through a door: he leads now (the first Keen, the
-        // camera follows him), player 1 comes along
-        let (x, y) = (g.objs[p1].x + 0x300, g.objs[p1].y);
-        g.as_p2(|g| {
-            g.objs[p2].x = x;
-            g.objs[p2].y = y;
-            g.mp_follow_door();
-        });
-        g.mp_tick();
-        assert!(g.mp.flipped);
-        assert_eq!((g.player, g.mp.p2), (p1, Some(p2)));
-        // (the fall shape may shift him a little, by his facing)
-        assert_eq!(g.objs[p1].x, x);
-        assert!((g.objs[p2].x - x).abs() < 0x100);
-        assert!(same(g.objs[p2].state, &S_KEENFALL1));
-        // the leader (player 2) went through one: player 1 follows, also
-        // from a pole (no clipping there, but not dying)
+        // player 2 elsewhere on the map, on a pole (no clipping there,
+        // but not dying)
+        g.objs[p2].x += 0x2000;
         g.as_p2(|g| {
             g.objs[p2].needtoclip = CL_NOCLIP;
             g.change_state(p2, &S_KEENPOLE);
         });
-        g.objs[p1].x = x + 0x100;
+        // player 1 went through a door to another spot: player 2 follows
+        let x = g.objs[p1].x + 0x500;
+        g.objs[p1].x = x;
         g.mp_follow_door();
-        assert!((g.objs[p2].x - (x + 0x100)).abs() < 0x100);
+        assert!((g.objs[p2].x - x).abs() < 0x100);
         assert!(same(g.objs[p2].state, &S_KEENFALL1));
-        assert!(g.mp.flipped);
+        // player 2's door takes only him
+        let x1 = g.objs[p1].x;
+        g.as_p2(|g| {
+            g.objs[p2].x += 0x1000;
+            g.mp_follow_door();
+        });
+        g.mp_tick();
+        assert!(!g.mp.flipped);
+        assert_eq!(g.objs[p1].x, x1);
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn brought_back_through_floors() {
+        let tmp = std::env::temp_dir().join(format!("keen-mp-warp-{}-{}", super::super::EPISODE, std::process::id()));
+        let _ = std::fs::create_dir_all(&tmp);
+        let Some(mut g) = two_player_game(&tmp) else { return };
+        let (p1, p2) = (g.player, g.mp.p2.unwrap());
+        // player 2 far above player 1 (floors in between in any level)
+        g.objs[p2].y = 0x300;
+        g.as_p2(|g| {
+            g.objs[p2].needtoclip = CL_NOCLIP;
+            g.change_state(p2, &S_KEENFALL1);
+            g.objs[p2].needtoclip = CL_MIDCLIP;
+        });
+        assert!(g.objs[p1].y > 0x800);
+        g.mp_warp_p2(p2);
+        // he arrives at player 1, not on a floor on the way
+        assert!((g.objs[p2].y - g.objs[p1].y).abs() < 0x100, "{:#x} {:#x}", g.objs[p2].y, g.objs[p1].y);
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn dizzy_keen_does_not_read() {
+        let tmp = std::env::temp_dir().join(format!("keen-mp-read-{}-{}", super::super::EPISODE, std::process::id()));
+        let _ = std::fs::create_dir_all(&tmp);
+        let Some(mut g) = two_player_game(&tmp) else { return };
+        if !g.mp_load_stunned() {
+            return; // (Keen 4/5 without Keen 6 files: no sitting sprite)
+        }
+        let p1 = g.player;
+        g.objs[p1].hitnorth = 1;
+        for st in [&S_KEENREAD2, &S_KEENWAIT3, &S_KEENSIT2] {
+            g.change_state(p1, st);
+            assert!(g.mp_sit_dizzy(p1), "{}", st.name);
+            assert!(same(g.objs[p1].state, &S_KEENSTAND));
+        }
         let _ = std::fs::remove_dir_all(&tmp);
     }
 }

@@ -116,8 +116,8 @@ runtime and are never committed.
   player 2 lives, `mp_handover` exchanges the two Keen objects' contents
   (the first stays `player`, the list head) and their globals;
   `MpState::flipped` (saved) maps controls, colors and score boxes to the
-  people until the level ends. Doors bring the other Keen along; through
-  the second Keen's door he takes the lead the same way (`mp.door_lead`). Shots carry
+  people until the level ends. The leading Keen's doors bring the other
+  one along; the second Keen's doors take only him. Shots carry
   `Obj::owner`; the other player's shot makes Keen dizzy (knocked off the
   pogo stick) (on the ground
   drawn sitting with Keen 6's stunned sprite, `Gfx::stunned`, which Keen
