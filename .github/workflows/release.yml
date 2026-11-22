@@ -1,0 +1,160 @@
+# Builds keen4, keen5 and keen6 for Linux, Windows and macOS when a release
+# is published and attaches the archives to it.
+#
+# The original game files are NOT bundled: they are only downloaded (from
+# archive.org, cached for half a year) to run the tests and replay the
+# original demos with each build as a check.
+name: Release builds
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  game-data:
+    name: Original game data (checks only)
+    runs-on: ubuntu-latest
+    steps:
+      # one cache key per half year, so archive.org is asked at most twice a year
+      - name: Cache key
+        id: key
+        run: echo "half=$(date -u +%Y)-h$(( ($(date -u +%-m) + 5) / 6 ))" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the original zip files
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: zips
+          key: keen-zips-${{ steps.key.outputs.half }}
+
+      - name: Download from archive.org
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p zips
+          dl() { [ -s "zips/$2" ] || curl -sSfL --retry 3 -o "zips/$2" "$1"; }
+          dl https://archive.org/download/keen-4/Keen4.zip keen4.zip
+          dl https://archive.org/download/keen5/keen5.zip keen5.zip
+          dl https://archive.org/download/keen-6/Keen6.zip keen6.zip
+
+      - name: Unpack into KEEN4, KEEN5, KEEN6
+        run: |
+          for n in 4 5 6; do
+            tmp=$(mktemp -d)
+            unzip -q "zips/keen$n.zip" -d "$tmp"
+            # the zips differ in layout: take the directory holding EGAGRAPH.CKn
+            src=$(dirname "$(find "$tmp" -iname "EGAGRAPH.CK$n" | head -n1)")
+            mkdir -p "data/KEEN$n"
+            cp "$src"/* "data/KEEN$n/"
+            ls -l "data/KEEN$n"
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: game-data
+          path: data
+          retention-days: 1
+
+  build:
+    name: ${{ matrix.name }}
+    needs: game-data
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+            exe: ""
+          - name: windows-x86_64
+            os: windows-latest
+            exe: .exe
+          - name: macos-universal
+            os: macos-latest
+            exe: ""
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.name }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: game-data
+          path: .
+
+      - name: Build
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            cargo build --release -p keen --target aarch64-apple-darwin
+            cargo build --release -p keen --target x86_64-apple-darwin
+            mkdir -p target/release
+            for e in 4 5 6; do
+              lipo -create -output target/release/keen$e \
+                target/aarch64-apple-darwin/release/keen$e \
+                target/x86_64-apple-darwin/release/keen$e
+            done
+          else
+            cargo build --release -p keen
+          fi
+
+      - name: Tests (with the original data)
+        run: cargo test --release -p keen
+
+      - name: Replay the original demos
+        run: |
+          for e in 4 5 6; do
+            for d in 0 1 2 3; do
+              KEEN_TRACE="trace-$e-$d.txt" ./target/release/keen$e${{ matrix.exe }} \
+                --data KEEN$e --headless --nosound --demo $d
+              [ -s "trace-$e-$d.txt" ] || { echo "keen$e demo $d produced no trace"; exit 1; }
+              echo "keen$e demo $d: $(wc -l < trace-$e-$d.txt) trace lines"
+            done
+          done
+
+      - name: Package
+        id: pkg
+        run: |
+          tag="${{ github.event.release.tag_name || github.ref_name }}"
+          name="commander-keen-rust-$tag-${{ matrix.name }}"
+          mkdir "$name"
+          for e in 4 5 6; do cp "target/release/keen$e${{ matrix.exe }}" "$name/"; done
+          cp README.md "$name/"
+          if [ "$RUNNER_OS" = Windows ]; then
+            7z a -tzip "$name.zip" "$name" > /dev/null
+            echo "file=$name.zip" >> "$GITHUB_OUTPUT"
+          else
+            tar czf "$name.tar.gz" "$name"
+            echo "file=$name.tar.gz" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ steps.pkg.outputs.file }}
+
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "${{ steps.pkg.outputs.file }}" --clobber
