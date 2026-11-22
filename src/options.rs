@@ -23,6 +23,7 @@ pub struct Options {
     /// cheat option: dying costs no life
     pub unlimited_lives: bool,
     /// cheat option SHOW INVENTORY off: no items box at the bottom right
+    /// (it is only shown with --cheatmode)
     pub hide_inventory: bool,
     /// --no-auto-save: no AUTOSAVE.CKn while playing / resume at start
     pub no_auto_save: bool,
@@ -30,6 +31,4 @@ pub struct Options {
     /// no_auto_save, no quick save (gamepad save/load state, the load menu's
     /// second page, --cheatmode F2/F3), no MIDI music and no volume bars
     pub classic: bool,
-    /// --two-players: two player mode on (also CONFIGURE > USE GAMEPAD)
-    pub two_players: bool,
 }

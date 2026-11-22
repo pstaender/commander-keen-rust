@@ -67,10 +67,10 @@ impl Game {
             self.draw_overlay_sprite(DEMOPLAQUESPR, 0x80, 0x08, scale);
             return;
         }
-        // the inventory (not in the original): bottom right, also in one
-        // player games, unless switched off (cheat option SHOW INVENTORY)
-        // or --classic
-        if !self.opts.hide_inventory && !self.opts.classic {
+        // the inventory (not in the original): bottom right, with
+        // --cheatmode only (on unless switched off with the cheat option
+        // SHOW INVENTORY), not with --classic
+        if self.opts.cheatmode && !self.opts.hide_inventory && !self.opts.classic {
             self.draw_items_box();
         }
         if !self.showscorebox {

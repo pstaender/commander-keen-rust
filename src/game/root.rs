@@ -191,7 +191,6 @@ impl Game {
             spec_tiles: Default::default(),
         };
         g.init_obj_array();
-        g.mp.enabled = g.opts.two_players;
         g
     }
 

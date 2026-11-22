@@ -34,9 +34,6 @@ const USAGE: &str = "keenN [options]
   --no-auto-save     do not save the running game every 5 seconds (by
                      default it is saved to saves/AUTOSAVE.CKN and offered
                      to resume at the next start)
-  --two-players      two player mode (also CONFIGURE > USE GAMEPAD > TWO
-                     PLAYERS): player 1 plays with the gamepad, player 2
-                     with a second gamepad or the keyboard; needs a gamepad
   --level N          start directly in map N
   --difficulty D     difficulty for --level: easy, normal (default), hard
   --maps DIR         load GAMEMAPS.CKn (and MAPHEAD.CKn) from DIR, e.g.
@@ -97,7 +94,6 @@ pub fn main(default_dir: &str) {
             "--classic" => opts.classic = true,
             "--cheatmode" => opts.cheatmode = true,
             "--no-auto-save" => opts.no_auto_save = true,
-            "--two-players" => opts.two_players = true,
             "--difficulty" => {
                 opts.start_difficulty = match next(&mut i).to_ascii_lowercase().as_str() {
                     "easy" | "1" => Some(1),

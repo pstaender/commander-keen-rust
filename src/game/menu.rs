@@ -3037,8 +3037,7 @@ impl Game {
                 "compatibility" => self.menu.compatibility = n == 1,
                 "jerk" => self.menu.jerk = n == 1,
                 "twobutton" => self.twobutton = n == 1,
-                // (--two-players turns it on whatever the config says)
-                "twoplayers" => self.mp.enabled = n == 1 || self.opts.two_players,
+                "twoplayers" => self.mp.enabled = n == 1,
                 "controltype" => self.menu.controltype = 0,
                 "button0" => d.button0 = sc.unwrap_or(d.button0),
                 "button1" => d.button1 = sc.unwrap_or(d.button1),

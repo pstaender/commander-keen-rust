@@ -62,7 +62,8 @@ pub struct PlayerVars {
 
 #[derive(Clone, Default)]
 pub struct MpState {
-    /// two player mode chosen (config.txt `twoplayers`, --two-players)
+    /// two player mode chosen (CONFIGURE > USE GAMEPAD > TWO PLAYERS,
+    /// config.txt `twoplayers`)
     pub enabled: bool,
     /// player 2's object in the current level
     pub p2: Option<usize>,

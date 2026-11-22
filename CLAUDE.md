@@ -87,15 +87,16 @@ runtime and are never committed.
   (`Game::set_screen_width`); title, story etc. stay 320. The help menu's
   hand can point at the HELP! title: `NEW_HELP` in text.rs, the pages about
   this version (keep it current when adding features).
-- Two player mode (`src/game/mp.rs`, `--two-players` or CONFIGURE > USE
-  GAMEPAD > TWO PLAYERS, config `twoplayers`): a second Keen object in
+- Two player mode (`src/game/mp.rs`, CONFIGURE > USE GAMEPAD > TWO
+  PLAYERS, offered when a gamepad is detected, config `twoplayers`): a second Keen object in
   levels (not in demos, not with --classic, needs a gamepad); on the world
   map only a sprite following Keen 1's path (`mp_world_tick`,
   `RfState::extra`). Keen 2 is drawn 2 pixels higher (`ALTYOFFSET`)
   and behind Keen 1. A new game in two player mode starts with 6 lives.
-  The inventory (gems, K5 keycard, K6 special items; one and two players,
-  not with --classic) is shown at the bottom right (`draw_items_box`,
-  cheat option SHOW INVENTORY; on the world map only the K6 special items). Player 1 = first pad, player 2 = second pad or keyboard
+  With --cheatmode the inventory (gems, K5 keycard, K6 special items) is
+  shown at the bottom right, one and two players (`draw_items_box`, cheat
+  option SHOW INVENTORY, on by default; on the world map only the K6
+  special items). Player 1 = first pad, player 2 = second pad or keyboard
   (`Input::split`, `read_control_p2`). `Game::as_p2` swaps player 2's
   globals (`player`, `c`, buttons, `gs.score`/`ammo`/`riding`,
   `invincible`, ...) in, so the ported code runs unchanged for him; the
