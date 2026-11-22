@@ -196,9 +196,13 @@ impl Game {
         let c = &mut self.cam;
         c.originxglobal = x;
         c.originyglobal = y;
-        // a wide view centered on a narrow room can start left of the map
-        c.originxtile = if x < 0 && c.wide() { 0 } else { (x as u16 >> 8) as i32 };
-        c.originytile = if y < 0 && c.tall() { 0 } else { (y as u16 >> 8) as i32 };
+        // a wide (zoomed out) view centered on a narrow room can start left
+        // of (above) the map: at least tile 1, since the activation check
+        // in PlayLoop compares `originxtile - 1` unsigned (0 would wrap and
+        // no object would ever become active again). The original view
+        // never goes below tile 2.
+        c.originxtile = if c.wide() { (x >> 8).max(1) } else { (x as u16 >> 8) as i32 };
+        c.originytile = if c.tall() { (y >> 8).max(1) } else { (y as u16 >> 8) as i32 };
     }
 
     /// RF_NewPosition
@@ -354,14 +358,18 @@ impl Game {
         let c = &mut self.cam;
         let t = c.view_tiles();
         let r = c.view_rows();
-        c.originxtilemax = c.originxtile + t;
-        c.originytilemax = c.originytile + r;
+        // (the view's real first tile: left of / above the map when a wide
+        // or zoomed out view is centered on a narrow room)
+        let x0 = if c.wide() { c.originxglobal >> 8 } else { c.originxtile };
+        let y0 = if c.tall() { c.originyglobal >> 8 } else { c.originytile };
+        c.originxtilemax = x0 + t;
+        c.originytilemax = y0 + r;
         // Keen 5 keeps objects active 6 tiles beyond the view (0x183f1)
         let m = ep_sel!(4, 6, 4);
-        c.inactivateleft = (c.originxtile - m).max(0);
-        c.inactivateright = (c.originxtile + t + m).max(0);
-        c.inactivatetop = (c.originytile - m).max(0);
-        c.inactivatebottom = (c.originytile + r + m).max(0);
+        c.inactivateleft = (x0 - m).max(0);
+        c.inactivateright = (x0 + t + m).max(0);
+        c.inactivatetop = (y0 - m).max(0);
+        c.inactivatebottom = (y0 + r + m).max(0);
     }
 
     pub fn rf_set_scroll_block(&mut self, x: i32, y: i32, horizontal: bool) {

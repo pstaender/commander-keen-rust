@@ -1032,8 +1032,25 @@ mod tests {
         assert_eq!((g.sys.surface.xoff, g.sys.surface.yoff), (160, 100));
         assert_eq!(g.fall_line(), fall);
         let p = g.player;
+        // a small room near the top left corner: the centered view starts
+        // left of and above the map, objects in it must still wake up
+        // (the activation check of PlayLoop, unsigned like the original)
+        let (sx, sy, sb, sv) = (g.objs[p].x, g.objs[p].y, g.cam.hblocks.clone(), g.cam.vblocks.clone());
+        g.objs[p].x = 0x380;
+        g.objs[p].y = 0x380;
+        g.cam.vblocks.push(6);
+        g.cam.hblocks.push(6);
+        g.rf_new_position(0x200, 0x200);
+        g.update_active_bounds();
+        assert!(g.cam.originxglobal < 0 && g.cam.originyglobal < 0);
+        let c = &g.cam;
+        let (tl, tt) = (3u16, 3u16);
+        assert!(((c.originxtile - 1) as u16) <= tl && tl <= (c.originxtilemax + 1) as u16);
+        assert!(((c.originytile - 1) as u16) <= tt && tt <= (c.originytilemax + 1) as u16);
+        assert!(c.originxtilemax < 40 && c.originytilemax < 25);
+        (g.objs[p].x, g.objs[p].y, g.cam.hblocks, g.cam.vblocks) = (sx, sy, sb, sv);
         g.center_actor(p);
-        assert_eq!(g.cam.originytilemax - g.cam.originytile, 25);
+        assert_eq!(g.cam.originytilemax - (g.cam.originyglobal >> 8), 25);
         let (o, c) = (&g.objs[p], &g.cam);
         assert!(c.originyglobal <= o.top && o.bottom <= c.originyglobal + 400 * 16);
         assert!(c.originxglobal <= o.left && o.right <= c.originxglobal + 640 * 16);
