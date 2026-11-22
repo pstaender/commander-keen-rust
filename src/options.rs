@@ -22,8 +22,7 @@ pub struct Options {
     pub allow_reenter: bool,
     /// cheat option: dying costs no life
     pub unlimited_lives: bool,
-    /// cheat option SHOW INVENTORY off: no items box between the score
-    /// boxes in two player mode
+    /// cheat option SHOW INVENTORY off: no items box at the bottom right
     pub hide_inventory: bool,
     /// --no-auto-save: no AUTOSAVE.CKn while playing / resume at start
     pub no_auto_save: bool,

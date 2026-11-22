@@ -85,7 +85,7 @@ case-insensitively.
 | `--maps DIR` | load `GAMEMAPS.CKn` (and `MAPHEAD.CKn`) from DIR, e.g. levels made with the Commander Keen Editor |
 | `--demo N\|FILE` | play the original demo N (0–3, 4 = high score screen), or a demo file recorded with F10+D, and exit |
 | `--debug-shortcuts` | enable the F10 debug keys (alias `--debug`) |
-| `--cheatmode` | CHEAT OPTIONS replaces END GAME in the main menu: add lives and shots, allow re-entering finished levels, unlimited lives, show inventory (two player mode) |
+| `--cheatmode` | CHEAT OPTIONS replaces END GAME in the main menu: add lives and shots, allow re-entering finished levels, unlimited lives, show inventory |
 | `--dump DIR` | export all original graphics as PNG files and exit |
 | `--export-sfx DIR` | export all original sound effects as `DIR/NN-adlib.wav` and `DIR/NN-pc.wav` and exit (e.g. to compare with an audio pack) |
 | `--headless` | run without a window (automated testing) |

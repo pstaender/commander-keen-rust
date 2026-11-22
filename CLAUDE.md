@@ -93,9 +93,9 @@ runtime and are never committed.
   map only a sprite following Keen 1's path (`mp_world_tick`,
   `RfState::extra`). Keen 2 is drawn 2 pixels higher (`ALTYOFFSET`)
   and behind Keen 1. A new game in two player mode starts with 6 lives.
-  The shared items (gems, K5 keycard, K6 special items) are shown between
-  the score boxes (`draw_items_box`, cheat option SHOW INVENTORY; on the
-  world map only the K6 special items). Player 1 = first pad, player 2 = second pad or keyboard
+  The inventory (gems, K5 keycard, K6 special items; one and two players,
+  not with --classic) is shown at the bottom right (`draw_items_box`,
+  cheat option SHOW INVENTORY; on the world map only the K6 special items). Player 1 = first pad, player 2 = second pad or keyboard
   (`Input::split`, `read_control_p2`). `Game::as_p2` swaps player 2's
   globals (`player`, `c`, buttons, `gs.score`/`ammo`/`riding`,
   `invincible`, ...) in, so the ported code runs unchanged for him; the

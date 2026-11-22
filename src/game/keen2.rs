@@ -67,6 +67,12 @@ impl Game {
             self.draw_overlay_sprite(DEMOPLAQUESPR, 0x80, 0x08, scale);
             return;
         }
+        // the inventory (not in the original): bottom right, also in one
+        // player games, unless switched off (cheat option SHOW INVENTORY)
+        // or --classic
+        if !self.opts.hide_inventory && !self.opts.classic {
+            self.draw_items_box();
+        }
         if !self.showscorebox {
             return;
         }
@@ -78,16 +84,13 @@ impl Game {
             let w = self.gfx.sprites.get(idx).map_or(0, |t| t.w as i32 / scale);
             let x = self.cam.view_w() - w - 4;
             self.draw_score_box_for(x, score, ammo, true);
-            if !self.opts.hide_inventory {
-                self.draw_items_box();
-            }
         }
     }
 
-    /// Two player mode: the items both players share for getting through
-    /// the level (gems; Keen 5 the keycard, Keen 6 the sandwich, rope
-    /// and passcard), centered between the score boxes (unless switched
-    /// off: cheat option SHOW INVENTORY). The icons of the
+    /// The inventory: the items for getting through the level (gems;
+    /// Keen 5 the keycard, Keen 6 the sandwich, rope and passcard; shared
+    /// in two player mode), at the bottom right of the play field. The
+    /// icons of the
     /// status window; an empty slot is a small gray square. On the world
     /// map only what is used there (Keen 6's special items): gems and
     /// keycard only open doors in levels.
@@ -108,19 +111,19 @@ impl Game {
         if items.is_empty() {
             return;
         }
-        // 8 pixel icons 2 pixels apart, 3 pixels border, as high as the
-        // middle of the score boxes (32 pixels from y 4)
+        // 8 pixel icons 1 pixel apart, 2 pixels border, 4 pixels from the
+        // bottom right corner
         let n = items.len() as i32;
-        let (w, h) = (n * 10 + 4, 14);
-        let x = (self.cam.view_w() - w) / 2;
-        let y = 4 + (32 - h) / 2;
+        let (w, h) = (n * 9 + 3, 12);
+        let x = self.cam.view_w() - w - 5;
+        let y = 200 - h - 5;
         self.sys.surface.bar(x - 1, y - 1, w + 2, h + 2, 8);
         self.sys.surface.bar(x, y, w, h, 0);
         for (i, it) in items.into_iter().enumerate() {
-            let ix = x + 3 + i as i32 * 10;
+            let ix = x + 2 + i as i32 * 9;
             match it {
-                Some(t) => self.draw_tile8(ix, y + 3, t),
-                None => self.sys.surface.bar(ix + 2, y + 5, 4, 4, 8),
+                Some(t) => self.draw_tile8(ix, y + 2, t),
+                None => self.sys.surface.bar(ix + 3, y + 5, 2, 2, 8),
             }
         }
     }
