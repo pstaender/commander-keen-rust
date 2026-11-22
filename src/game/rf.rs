@@ -126,6 +126,9 @@ pub struct SpriteSlot {
     pub alt: bool,
     /// two player mode: a dizzy Keen, drawn sitting (`Gfx::stunned`)
     pub stunned: bool,
+    /// two player mode: the Keen who doesn't lead (the view follows the
+    /// other one), drawn behind him whatever his colors
+    pub behind: bool,
 }
 
 /// One animation group (allanims entry).
@@ -647,10 +650,12 @@ impl Game {
             -self.rf.order
         };
         let alt = self.mp_is_player2(ob);
-        // (two player mode: Keen 2 is drawn 2 pixels higher, so the Keens
-        // never cover each other completely)
-        let y = if alt { y - super::mp::ALTYOFFSET } else { y };
-        self.rf.sprites[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false, alt, stunned: false };
+        // (two player mode: the Keen who doesn't lead is drawn behind the
+        // other one and 2 pixels higher, so the Keens never cover each
+        // other completely)
+        let behind = self.mp_player_of(ob) == Some(1);
+        let y = if behind { y - super::mp::ALTYOFFSET } else { y };
+        self.rf.sprites[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false, alt, stunned: false, behind };
         self.objs[ob].sprite = true;
     }
 
@@ -662,7 +667,7 @@ impl Game {
             self.rf.order += 1;
             -self.rf.order
         };
-        self.rf.stars[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false, alt: false, stunned: false };
+        self.rf.stars[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false, alt: false, stunned: false, behind: false };
     }
 
     /// Switches the placed sprite of `ob` to white (maskdraw) drawing.
@@ -776,8 +781,9 @@ impl Game {
         // sprites by priority, masked foreground tiles before priority 3
         let mut list: Vec<SpriteSlot> =
             self.rf.sprites.iter().chain(self.rf.stars.iter()).chain(self.rf.extra.iter()).filter(|s| s.visible).copied().collect();
-        // (two player mode: Keen 2 first, i.e. behind Keen 1)
-        list.sort_by_key(|s| (s.priority, if s.alt { i64::MIN } else { s.order }));
+        // (two player mode: the Keen who doesn't lead first, i.e. behind
+        // the one the view follows)
+        list.sort_by_key(|s| (s.priority, if s.behind { i64::MIN } else { s.order }));
         let mut i = 0;
         for pr in 0..PRIORITIES {
             if pr == MASKEDTILEPRIORITY {

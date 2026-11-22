@@ -129,7 +129,7 @@ fn place_extra_sprite(g: &mut Game, ob: usize, slot: usize, x: i32, y: i32, shap
     }
     g.rf.order += 1;
     let order = g.rf.order;
-    g.rf.sprites[idx] = SpriteSlot { visible: shape != 0, x, y, shape, priority, order, white: false, alt: false, stunned: false };
+    g.rf.sprites[idx] = SpriteSlot { visible: shape != 0, x, y, shape, priority, order, white: false, alt: false, stunned: false, behind: false };
 }
 
 /// SpawnEnemyShot (0x1f923, act1): Some(new object), or None if there

@@ -106,13 +106,15 @@ runtime and are never committed.
   this version (keep it current when adding features).
 - Two player mode (`src/game/mp.rs`, CONFIGURE > USE GAMEPAD > TWO
   PLAYERS, or EXTENDED OPTIONS > TWO PLAYERS; offered when a gamepad is
-  detected, config `twoplayers`; switched
+  detected, config `twoplayers`; switched in a level it applies at once,
+  `mp_apply_mode`; switched
   on by itself when two gamepads show up in the first seconds,
   `Input::two_pads_at_start`, `mp_auto_enable`): a second Keen object in
   levels (not in demos, not with --classic, needs a gamepad); on the world
   map only a sprite following Keen 1's path (`mp_world_tick`,
-  `RfState::extra`). Keen 2 is drawn 2 pixels higher (`ALTYOFFSET`)
-  and behind Keen 1. A new game in two player mode starts with 6 lives.
+  `RfState::extra`). The Keen who doesn't lead (Keen 2, or Keen 1
+  after a handover) is drawn behind the leading one and 2 pixels higher
+  (`SpriteSlot::behind`, `ALTYOFFSET`). A new game in two player mode starts with 6 lives.
   In extended mode the inventory (gems, K5 keycard, K6 special items) is
   shown at the bottom right, one and two players (`draw_items_box`, extended
   option SHOW INVENTORY, on by default; on the world map only the K6

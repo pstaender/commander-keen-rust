@@ -413,6 +413,51 @@ impl Game {
         true
     }
 
+    /// TWO PLAYERS switched in the middle of a level (in the control
+    /// panel): off, player 2's Keen leaves at once (player 1 keeps or gets
+    /// back the lead); on, he joins next to player 1.
+    fn mp_apply_mode(&mut self) {
+        if self.mp.swapped {
+            return;
+        }
+        if !self.mp.enabled {
+            if !self.mp_in_level() && !self.mp.flipped {
+                return;
+            }
+            if self.mp.flipped {
+                // player 1's Keen (the second object) alive: back to him
+                // leading; otherwise only player 1's globals come back and
+                // he plays on with the remaining Keen
+                if !self.mp_handover(true) {
+                    self.mp_unflip();
+                }
+            }
+            if let Some(n) = self.mp.p2.take() {
+                self.remove_obj(n);
+            }
+            self.mp.respawn = 0;
+            self.mp.away = 0;
+            self.mp.dizzy = [0; 2];
+            self.mp.out = false;
+            self.mp.other.riding = None;
+            self.mp.other.invincible = 0;
+            return;
+        }
+        // switched on: join like after loading a one player game
+        let p = self.player;
+        if self.mp_available()
+            && !self.mp_in_level()
+            && !self.mp.out
+            && self.gs.mapon != 0
+            && self.objs[p].obclass == KEENOBJ
+            && self.objs[p].needtoclip != CL_NOCLIP
+            && !self.keen_dying()
+            && self.mp_spawn_p2(&S_KEENFALL1)
+        {
+            self.mp.other.invincible = RESPAWNINVINCIBLE;
+        }
+    }
+
     /// Player 2 died (fell off the screen dying, or out of the map): he
     /// comes back next to player 1 for one of the shared lives.
     fn mp_p2_died(&mut self) {
@@ -495,6 +540,7 @@ impl Game {
     /// 2 back when he is off screen too long, coming back after dying,
     /// dizziness.
     pub fn mp_tick(&mut self) {
+        self.mp_apply_mode();
         // player 1 dies: player 2 goes on
         if self.mp.p2.is_some() && !self.mp.swapped && self.keen_dying() {
             self.mp_handover(false);
@@ -630,6 +676,7 @@ impl Game {
             white: false,
             alt: true,
             stunned: false,
+            behind: true,
         };
         self.rf.extra = vec![slot];
     }
@@ -876,6 +923,14 @@ mod tests {
         assert_eq!((g.gs.score, g.mp.other.score), (200, 100));
         assert!(g.mp_is_player2(p1) && !g.mp_is_player2(p2));
         assert!(g.mp_p2_dying(p2));
+        // the leading Keen (in player 2's colors) is drawn in front
+        g.place_sprite(p1);
+        g.place_sprite(p2);
+        assert!(g.rf.sprites[p1].alt && !g.rf.sprites[p1].behind);
+        assert!(!g.rf.sprites[p2].alt && g.rf.sprites[p2].behind);
+        // and the one behind is the one drawn 2 pixels higher
+        assert_eq!(g.rf.sprites[p1].y, g.objs[p1].y);
+        assert_eq!(g.rf.sprites[p2].y, g.objs[p2].y - super::ALTYOFFSET);
         // the dead player 1 costs a life and comes back as the second Keen
         g.as_p2(|g| g.playstate = EX_DIED);
         assert_eq!(g.playstate, EX_STILLPLAYING);
@@ -1010,6 +1065,42 @@ mod tests {
             assert!(g.mp_sit_dizzy(p1), "{}", st.name);
             assert!(same(g.objs[p1].state, &S_KEENSTAND));
         }
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// TWO PLAYERS switched off in a level: player 2's Keen leaves at the
+    /// next frame, also when he leads (player 1 gets the lead back);
+    /// switched on again he joins.
+    #[test]
+    fn switching_two_players_off_and_on_in_a_level() {
+        let tmp = std::env::temp_dir().join(format!("keen-mp-off-{}-{}", super::super::EPISODE, std::process::id()));
+        let _ = std::fs::create_dir_all(&tmp);
+        let Some(mut g) = two_player_game(&tmp) else { return };
+        let (p1, p2) = (g.player, g.mp.p2.unwrap());
+        g.mp.enabled = false;
+        g.mp_tick();
+        assert_eq!(g.mp.p2, None);
+        assert!(g.obj_free[p2] && !g.rf.sprites[p2].visible);
+        assert!(!g.mp_in_level() && !g.mp.flipped);
+        // on again: he is back next to player 1
+        g.mp.enabled = true;
+        g.mp_tick();
+        let p2 = g.mp.p2.expect("player 2 joined");
+        assert!((g.objs[p2].x - g.objs[p1].x).abs() < 0x100);
+        // player 2 leads (player 1 died), then off: player 1 leads again
+        // with his own score, the dead Keen is gone
+        g.gs.score = 100;
+        g.mp.other.score = 200;
+        g.objs[p2].x += 0x100;
+        g.kill_keen();
+        g.mp_tick();
+        assert!(g.mp.flipped);
+        g.mp.enabled = false;
+        g.mp_tick();
+        assert!(!g.mp.flipped && g.mp.p2.is_none());
+        assert_eq!(g.player, p1);
+        assert_eq!(g.gs.score, 100);
+        assert!(g.obj_free[p2]);
         let _ = std::fs::remove_dir_all(&tmp);
     }
 

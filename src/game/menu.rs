@@ -1323,7 +1323,8 @@ impl Game {
                 self.usl_draw_ctl_panel();
                 true
             }
-            // two player mode (from the next level on)
+            // two player mode (in a level at once when the game goes on,
+            // `mp_apply_mode`)
             UIC_HIT if i == Some(PAD_TWOPLAYERS_ITEM) => {
                 self.mp.enabled = !self.mp.enabled;
                 self.usl_set_options_text();
@@ -1577,7 +1578,7 @@ impl Game {
                         self.opts.zoom = zs[(i + 1) % zs.len()];
                         self.opts.zoom_given = false;
                     }
-                    // two player mode (from the next level on), the same
+                    // two player mode (at once when the game goes on), the same
                     // switch as in CONFIGURE > USE GAMEPAD
                     7 => {
                         self.mp.enabled = !self.mp.enabled;
