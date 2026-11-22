@@ -99,41 +99,60 @@ impl Game {
 
     /// The inventory: the items for getting through the level (gems;
     /// Keen 5 the keycard, Keen 6 the sandwich, rope and passcard; shared
-    /// in two player mode), at the bottom right of the play field. The
-    /// icons of the
-    /// status window; an empty slot is a small gray square. On the world
+    /// in two player mode), at the bottom right of the play field, framed
+    /// like the score box. The icons of the status window; an item not
+    /// collected yet is shown unlit (Keen 6's own dark icons, otherwise the
+    /// icon's shape in dark gray). On the world
     /// map only what is used there (Keen 6's special items): gems and
     /// keycard only open doors in levels.
     fn draw_items_box(&mut self) {
         let level = self.gs.mapon != 0;
-        let mut items: Vec<Option<i32>> = Vec::new();
+        // (icon, collected, the episode's own "not collected" icon)
+        let mut items: Vec<(i32, bool, Option<i32>)> = Vec::new();
         if level {
-            items.extend((0..4).map(|i| (self.gs.keys[i] > 0).then_some(0x24 + i as i32)));
+            items.extend((0..4).map(|i| (0x24 + i as i32, self.gs.keys[i] > 0, None)));
             ep5! {
-                items.push((self.gs.keycard != 0).then_some(0x28));
+                items.push((0x28, self.gs.keycard != 0, None));
             }
         }
         ep6! {
-            items.push((self.gs.sandwichstate == 1).then_some(2));
-            items.push((self.gs.hookstate == 1).then_some(4));
-            items.push((self.gs.passcardstate == 1).then_some(6));
+            // (the status window's dark icons: 1, 3, 5)
+            items.push((2, self.gs.sandwichstate == 1, Some(1)));
+            items.push((4, self.gs.hookstate == 1, Some(3)));
+            items.push((6, self.gs.passcardstate == 1, Some(5)));
         }
         if items.is_empty() {
             return;
         }
-        // 8 pixel icons 1 pixel apart, 2 pixels border, 4 pixels from the
-        // bottom right corner
+        // framed like the score box: a black panel with rounded corners in
+        // a light gray border, the outer edge white at the top and right,
+        // black at the left and bottom; 8 pixel icons 1 pixel apart, 4
+        // pixels from the bottom right corner
         let n = items.len() as i32;
-        let (w, h) = (n * 9 + 3, 12);
-        let x = self.cam.view_w() - w - 5;
-        let y = self.cam.view_hpx() - h - 5;
-        self.sys.surface.bar(x - 1, y - 1, w + 2, h + 2, 8);
-        self.sys.surface.bar(x, y, w, h, 0);
-        for (i, it) in items.into_iter().enumerate() {
-            let ix = x + 2 + i as i32 * 9;
-            match it {
-                Some(t) => self.draw_tile8(ix, y + 2, t),
-                None => self.sys.surface.bar(ix + 3, y + 5, 2, 2, 8),
+        let (pw, ph) = (n * 9 + 3, 12);
+        let (w, h) = (pw + 6, ph + 4);
+        let x = self.cam.view_w() - w - 4;
+        let y = self.cam.view_hpx() - h - 4;
+        let s = &mut self.sys.surface;
+        s.bar(x, y, w, h, 0);
+        s.bar(x + 1, y, w - 1, 1, 15);
+        s.bar(x + w - 2, y, 2, h - 1, 15);
+        s.bar(x + w - 1, y + h - 1, 1, 1, 15);
+        s.bar(x + 2, y + 1, w - 4, h - 2, 7);
+        let (px, py) = (x + 3, y + 2);
+        s.bar(px, py, pw, ph, 0);
+        for (cx, cy) in [(px, py), (px + pw - 1, py), (px, py + ph - 1), (px + pw - 1, py + ph - 1)] {
+            s.bar(cx, cy, 1, 1, 7);
+        }
+        for (i, (t, have, dark)) in items.into_iter().enumerate() {
+            let (ix, iy) = (px + 2 + i as i32 * 9, py + 2);
+            if have {
+                self.draw_tile8(ix, iy, t);
+            } else if let Some(d) = dark {
+                self.draw_tile8(ix, iy, d);
+            } else if let Some(tex) = self.gfx.tile8.get(t as usize) {
+                // unlit, like the score box's dark digits
+                self.sys.surface.blit_silhouette(tex, ix, iy, 8);
             }
         }
     }

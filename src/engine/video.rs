@@ -222,6 +222,23 @@ impl Surface {
         }
     }
 
+    /// Draws the non-black pixels of a texture at logical (x, y) in a
+    /// single EGA colour (an "unlit" icon).
+    pub fn blit_silhouette(&mut self, t: &Tex, x: i32, y: i32, color: u8) {
+        let s = self.scale as i32;
+        let (px, py) = ((x + self.xoff) * s, (y + self.yoff) * s);
+        let c = 0xff000000 | EGA_RGB[(color & 15) as usize];
+        let (cx0, cy0, cx1, cy1) = self.clip;
+        for yy in py.max(cy0)..(py + t.h as i32).min(cy1) {
+            for xx in px.max(cx0)..(px + t.w as i32).min(cx1) {
+                let p = t.px[(yy - py) as usize * t.w + (xx - px) as usize];
+                if p >> 24 != 0 && p & 0xffffff != 0 {
+                    self.px[yy as usize * self.w + xx as usize] = c;
+                }
+            }
+        }
+    }
+
     /// Draws the opaque pixels of a texture in a single colour.
     pub fn blit_phys_solid(&mut self, t: &Tex, px: i32, py: i32, color: u32) {
         let (cx0, cy0, cx1, cy1) = self.clip;
