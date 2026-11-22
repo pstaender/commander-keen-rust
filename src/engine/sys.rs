@@ -918,9 +918,14 @@ fn window_icon() -> Option<winit::window::Icon> {
     let mut r = dec.read_info().ok()?;
     let mut buf = vec![0; r.output_buffer_size()];
     let info = r.next_frame(&mut buf).ok()?;
-    if info.color_type != png::ColorType::Rgba || info.bit_depth != png::BitDepth::Eight {
+    if info.bit_depth != png::BitDepth::Eight {
         return None;
     }
     buf.truncate(info.buffer_size());
-    winit::window::Icon::from_rgba(buf, info.width, info.height).ok()
+    let rgba = match info.color_type {
+        png::ColorType::Rgba => buf,
+        png::ColorType::Rgb => buf.chunks_exact(3).flat_map(|p| [p[0], p[1], p[2], 255]).collect(),
+        _ => return None,
+    };
+    winit::window::Icon::from_rgba(rgba, info.width, info.height).ok()
 }
