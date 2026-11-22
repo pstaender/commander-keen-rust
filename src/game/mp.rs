@@ -522,8 +522,8 @@ impl Game {
             let right = if c.wide() { (self.mapwidth - 2) * 256 } else { c.originxmax + 0x1400 };
             if !dying && ((o.left as u16) < c.originxmin as u16 || (right as u16) < o.right as u16) {
                 self.playstate = EX_COMPLETED;
-            } else if !dying && ((c.originymax + 0xd00) as u16) < o.bottom as u16 {
-                self.objs[p2].y -= o.bottom - (c.originymax + 0xd00);
+            } else if !dying && (self.fall_line() as u16) < o.bottom as u16 {
+                self.objs[p2].y -= o.bottom - self.fall_line();
                 self.play_sound(super::keen::SND_PLUMMET);
                 self.as_p2(|g| {
                     let god = std::mem::replace(&mut g.godmode, false);
@@ -1010,6 +1010,40 @@ mod tests {
             assert!(g.mp_sit_dizzy(p1), "{}", st.name);
             assert!(same(g.objs[p1].state, &S_KEENSTAND));
         }
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// Zoomed out to 50 percent the view is 400 lines high, Keen stays in
+    /// it, falling out of the map happens where it does in the original
+    /// view, and 100 percent restores the original view.
+    #[test]
+    fn zoomed_out_view() {
+        let tmp = std::env::temp_dir().join(format!("keen-zoom-test-{}-{}", super::super::EPISODE, std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let Some(mut g) = two_player_game(&tmp) else { return };
+        let fall = g.fall_line();
+        g.wide_ok = true;
+        g.opts.zoom = 50;
+        g.update_view();
+        assert_eq!(g.cam.view_hpx(), 400);
+        assert_eq!(g.cam.view_w(), 640);
+        assert_eq!((g.sys.surface.logical_w(), g.sys.surface.logical_h()), (640, 400));
+        assert_eq!((g.sys.surface.xoff, g.sys.surface.yoff), (160, 100));
+        assert_eq!(g.fall_line(), fall);
+        let p = g.player;
+        g.center_actor(p);
+        assert_eq!(g.cam.originytilemax - g.cam.originytile, 25);
+        let (o, c) = (&g.objs[p], &g.cam);
+        assert!(c.originyglobal <= o.top && o.bottom <= c.originyglobal + 400 * 16);
+        assert!(c.originxglobal <= o.left && o.right <= c.originxglobal + 640 * 16);
+        g.step_zoom(false);
+        g.update_view();
+        assert_eq!(g.cam.view_hpx(), 266);
+        g.opts.zoom = 100;
+        g.update_view();
+        assert_eq!((g.cam.view_w(), g.cam.view_hpx()), (320, 200));
+        assert_eq!(g.fall_line(), fall);
         let _ = std::fs::remove_dir_all(&tmp);
     }
 }

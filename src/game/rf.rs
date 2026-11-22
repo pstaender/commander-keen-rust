@@ -33,6 +33,9 @@ pub struct Camera {
     pub hblocks: Vec<i32>,
     /// logical width of the play field view in pixels (0 = original 320)
     pub view: i32,
+    /// logical height of the play field view in pixels (0 = original
+    /// 200; taller when zoomed out)
+    pub view_h: i32,
 }
 
 impl Camera {
@@ -54,6 +57,30 @@ impl Camera {
         self.view_w() != 320
     }
 
+    /// view height in pixels
+    pub fn view_hpx(&self) -> i32 {
+        if self.view_h == 0 {
+            200
+        } else {
+            self.view_h
+        }
+    }
+
+    /// tile rows covered by the view (13 for the original view)
+    pub fn view_rows(&self) -> i32 {
+        (self.view_hpx() + 15) / 16
+    }
+
+    /// zoomed out: the view is taller than the original 200 lines
+    pub fn tall(&self) -> bool {
+        self.view_hpx() != 200
+    }
+
+    /// extra view height beyond the original, in global units
+    pub fn extra_y(&self) -> i32 {
+        (self.view_hpx() - 200) * 16
+    }
+
     /// extra view width beyond the original, in global units
     pub fn extra(&self) -> i32 {
         (self.view_w() - 320) * 16
@@ -68,6 +95,16 @@ impl Camera {
         let right = self.vblocks.iter().copied().filter(|&b| b * 256 > px).min().unwrap_or(mapwidth);
         let (l, r) = ((left + 1) * 256, right * 256);
         (r - l < wg).then(|| (l + r) / 2 - wg / 2)
+    }
+
+    /// `narrow_room_x` for the height of a zoomed out view (the space
+    /// between the horizontal scroll blocks above and below `py`).
+    pub fn narrow_room_y(&self, py: i32, mapheight: i32) -> Option<i32> {
+        let hg = self.view_hpx() * 16;
+        let top = self.hblocks.iter().copied().filter(|&b| (b + 1) * 256 <= py).max().unwrap_or(-1);
+        let bottom = self.hblocks.iter().copied().filter(|&b| b * 256 > py).min().unwrap_or(mapheight);
+        let (t, b) = ((top + 1) * 256, bottom * 256);
+        (b - t < hg).then(|| (t + b) / 2 - hg / 2)
     }
 }
 
@@ -108,6 +145,15 @@ pub struct AnimTile {
 /// foreground tiles 0x868 and 0x8a0 play sounds 58 and 59. Keen 4 and 5
 /// have no such table.
 const ANIMSOUNDS: &[(u32, i32)] = ep_sel!(&[], &[], &[(0x8868, 58), (0x88a0, 59)]);
+
+/// Foreground tiles the level designers put where the original view never
+/// looks ("BLOCK", Keen 4 "EDGE OF MAP", Keen 6 "BOTTOM OF MAP"): drawn
+/// black in a wide or zoomed out view, which can reach them.
+const MARKER_TILES: &[usize] = ep_sel!(
+    &[972, 973],
+    &[1008, 1009, 1026, 1027],
+    &[1008, 1009, 1010, 1011, 1026, 1027, 1028, 1029]
+);
 
 pub struct RfState {
     pub anims: Vec<AnimTile>,
@@ -152,7 +198,7 @@ impl Game {
         c.originyglobal = y;
         // a wide view centered on a narrow room can start left of the map
         c.originxtile = if x < 0 && c.wide() { 0 } else { (x as u16 >> 8) as i32 };
-        c.originytile = (y as u16 >> 8) as i32;
+        c.originytile = if y < 0 && c.tall() { 0 } else { (y as u16 >> 8) as i32 };
     }
 
     /// RF_NewPosition
@@ -198,14 +244,33 @@ impl Game {
                 }
             }
         }
-        for &b in &c.hblocks {
-            if yt <= b && b <= yt + 6 {
-                y = (b + 1) * 256;
-                break;
+        if c.tall() {
+            // zoomed out: the rule of the wide view, for the height
+            let hg = c.view_hpx() * 16;
+            for &b in &c.hblocks {
+                let by = b * 256;
+                if y <= by && by <= y + hg / 2 {
+                    y = by + 256;
+                    break;
+                }
+                if y + hg / 2 < by && by < y + hg {
+                    y = by - hg;
+                    break;
+                }
             }
-            if yt + 7 <= b && b <= yt + 13 {
-                y = (b - 13) * 256;
-                break;
+            if let Some(cy) = c.narrow_room_y(self.objs[self.player].y, self.mapheight) {
+                y = cy;
+            }
+        } else {
+            for &b in &c.hblocks {
+                if yt <= b && b <= yt + 6 {
+                    y = (b + 1) * 256;
+                    break;
+                }
+                if yt + 7 <= b && b <= yt + 13 {
+                    y = (b - 13) * 256;
+                    break;
+                }
             }
         }
         self.calc_origin_stuff(x, y);
@@ -241,7 +306,16 @@ impl Game {
                 }
             }
         }
-        if dy > 0 {
+        if dy > 0 && self.cam.tall() {
+            let hg = self.cam.view_hpx() * 16;
+            for &b in &self.cam.hblocks {
+                let by = b * 256;
+                if y + hg > by && y - dy + hg <= by {
+                    y = by - hg;
+                    break;
+                }
+            }
+        } else if dy > 0 {
             for &b in &self.cam.hblocks {
                 if b == (y as u16 >> 8) as i32 + 13 {
                     y &= 0xff00;
@@ -261,6 +335,11 @@ impl Game {
                 x = cx;
             }
         }
+        if self.cam.tall() {
+            if let Some(cy) = self.cam.narrow_room_y(self.objs[self.player].y, self.mapheight) {
+                y = cy;
+            }
+        }
         self.calc_origin_stuff(x, y);
         let mx = (self.cam.originxtile - oldxt).abs();
         let my = (self.cam.originytile - oldyt).abs();
@@ -274,14 +353,15 @@ impl Game {
     pub fn update_active_bounds(&mut self) {
         let c = &mut self.cam;
         let t = c.view_tiles();
+        let r = c.view_rows();
         c.originxtilemax = c.originxtile + t;
-        c.originytilemax = c.originytile + 13;
+        c.originytilemax = c.originytile + r;
         // Keen 5 keeps objects active 6 tiles beyond the view (0x183f1)
         let m = ep_sel!(4, 6, 4);
         c.inactivateleft = (c.originxtile - m).max(0);
         c.inactivateright = (c.originxtile + t + m).max(0);
         c.inactivatetop = (c.originytile - m).max(0);
-        c.inactivatebottom = (c.originytile + 13 + m).max(0);
+        c.inactivatebottom = (c.originytile + r + m).max(0);
     }
 
     pub fn rf_set_scroll_block(&mut self, x: i32, y: i32, horizontal: bool) {
@@ -300,7 +380,7 @@ impl Game {
         self.cam.originxmin = 0x200;
         self.cam.originymin = 0x200;
         self.cam.originxmax = ((w - 22) * 256 - self.cam.extra()).max(self.cam.originxmin);
-        self.cam.originymax = ((h - 15) * 256).max(self.cam.originymin);
+        self.cam.originymax = ((h - 15) * 256 - self.cam.extra_y()).max(self.cam.originymin);
         self.cam.vblocks.clear();
         self.cam.hblocks.clear();
         self.rf_set_scroll_block(0, 1, true);
@@ -319,18 +399,25 @@ impl Game {
     /// original 320 is kept for demos (they only replay in sync with the
     /// original view), outside the game loop and with --classic-view.
     pub fn update_view(&mut self) {
-        let want = if self.opts.classic_view || self.demomode != 0 || !self.wide_ok {
-            320
+        let (want, want_h) = if self.opts.classic_view || self.demomode != 0 || !self.wide_ok {
+            (320, 200)
         } else {
-            self.sys.wide_width() as i32
+            let (w, h) = self.sys.zoomed_size(self.zoom() as u32);
+            (w as i32, h as i32)
         };
-        if want == self.cam.view_w() && self.sys.surface.logical_w() as i32 == want {
+        if want == self.cam.view_w()
+            && want_h == self.cam.view_hpx()
+            && self.sys.surface.logical_w() as i32 == want
+            && self.sys.surface.logical_h() as i32 == want_h
+        {
             return;
         }
-        self.sys.surface.set_width(want as usize);
+        self.sys.surface.set_size(want as usize, want_h as usize);
         self.cam.view = want;
+        self.cam.view_h = want_h;
         if self.mapwidth > 0 {
             self.cam.originxmax = ((self.mapwidth - 22) * 256 - self.cam.extra()).max(self.cam.originxmin);
+            self.cam.originymax = ((self.mapheight - 15) * 256 - self.cam.extra_y()).max(self.cam.originymin);
             let (x, y) = (self.cam.originxglobal, self.cam.originyglobal);
             self.rf_new_position(x, y);
             self.update_active_bounds();
@@ -344,10 +431,10 @@ impl Game {
     /// it did.
     pub fn set_screen_width(&mut self, wide: bool) -> bool {
         let want = if wide && !self.opts.classic_view { self.sys.wide_width() } else { 320 };
-        if self.sys.surface.logical_w() == want {
+        if self.sys.surface.logical_w() == want && self.sys.surface.logical_h() == 200 {
             return false;
         }
-        self.sys.surface.set_width(want);
+        self.sys.surface.set_size(want, 200);
         true
     }
 
@@ -361,13 +448,27 @@ impl Game {
         }
     }
 
+    /// First map row of the view (above the map only when zoomed out).
+    fn view_y0(&self) -> i32 {
+        if self.cam.tall() {
+            self.cam.originyglobal >> 8
+        } else {
+            self.cam.originytile
+        }
+    }
+
+    /// Tile rows drawn (the view plus the row scrolled in at the bottom).
+    fn draw_rows(&self) -> i32 {
+        self.cam.view_rows() + PORTTILESHIGH - 13 + 1
+    }
+
     /// Widescreen: blacks out what lies beyond the scroll blocks around the
     /// player when a room is narrower than the view.
     fn mask_scroll_blocks(&mut self) {
         let p = &self.objs[self.player];
         let (px, py) = (p.x, p.y);
         let (ox, oy) = (self.cam.originxglobal, self.cam.originyglobal);
-        let (vw, vh) = (self.cam.view_w(), 200);
+        let (vw, vh) = (self.cam.view_w(), self.cam.view_hpx());
         for &b in &self.cam.vblocks {
             let sx = (b * 256 - ox) >> 4;
             if sx + 16 <= 0 || sx >= vw {
@@ -488,9 +589,9 @@ impl Game {
             a.visible = 0;
         }
         let x0 = self.cam.originxtile;
-        let y0 = self.cam.originytile;
+        let y0 = self.view_y0();
         let tiles = self.cam.view_tiles() + PORTTILESWIDE - 20;
-        for ty in y0..y0 + PORTTILESHIGH {
+        for ty in y0..y0 + self.draw_rows() - 1 {
             for tx in x0..x0 + tiles {
                 if tx < 0 || ty < 0 || tx >= self.mapwidth || ty >= self.mapheight {
                     continue;
@@ -624,14 +725,16 @@ impl Game {
     pub fn draw_playfield(&mut self) {
         let scale = self.sys.surface.scale as i32;
         let x0 = self.view_x0();
-        let y0 = self.cam.originytile;
+        let y0 = self.view_y0();
         let sx = (self.cam.originxglobal >> 4) & 15;
         let sy = (self.cam.originyglobal >> 4) & 15;
         // the play field fills the whole (possibly wide) surface
         let xoff = std::mem::take(&mut self.sys.surface.xoff);
+        let yoff = std::mem::take(&mut self.sys.surface.yoff);
         self.sys.surface.reset_clip();
         let tiles = self.cam.view_tiles() + PORTTILESWIDE - 20;
-        for ty in 0..PORTTILESHIGH + 1 {
+        let hide_markers = self.cam.wide() || self.cam.tall();
+        for ty in 0..self.draw_rows() {
             for tx in 0..tiles + 1 {
                 let mx = x0 + tx;
                 let my = y0 + ty;
@@ -650,7 +753,9 @@ impl Game {
                     self.sys.surface.blit_phys(t, px * scale, py * scale);
                 }
                 let f = self.map_tile(1, mx, my);
-                if f != 0 {
+                if hide_markers && MARKER_TILES.contains(&f) {
+                    self.sys.surface.bar(px, py, 16, 16, 0);
+                } else if f != 0 {
                     if let Some(Some(t)) = self.gfx.tile16m.get(f) {
                         self.sys.surface.blit_phys(t, px * scale, py * scale);
                     }
@@ -679,23 +784,24 @@ impl Game {
             self.draw_sprite_slot(list[i]);
             i += 1;
         }
-        if self.cam.wide() {
+        if self.cam.wide() || self.cam.tall() {
             self.mask_scroll_blocks();
         }
         self.sys.surface.xoff = xoff;
+        self.sys.surface.yoff = yoff;
     }
 
     fn draw_foreground_tiles(&mut self) {
         let scale = self.sys.surface.scale as i32;
         let x0 = self.view_x0();
-        let y0 = self.cam.originytile;
+        let y0 = self.view_y0();
         let sx = (self.cam.originxglobal >> 4) & 15;
         let sy = (self.cam.originyglobal >> 4) & 15;
         let tiles = self.cam.view_tiles() + PORTTILESWIDE - 20;
-        for ty in 0..PORTTILESHIGH + 1 {
+        for ty in 0..self.draw_rows() {
             for tx in 0..tiles + 1 {
                 let f = self.map_tile(1, x0 + tx, y0 + ty);
-                if f == 0 || self.intile(f) & 0x80 == 0 {
+                if f == 0 || self.intile(f) & 0x80 == 0 || ((self.cam.wide() || self.cam.tall()) && MARKER_TILES.contains(&f)) {
                     continue;
                 }
                 if let Some(Some(t)) = self.gfx.tile16m.get(f) {

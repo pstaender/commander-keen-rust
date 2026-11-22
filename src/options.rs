@@ -1,5 +1,8 @@
 //! Options from the command line, shared by all episodes.
 
+/// The zoom steps of the play field in percent (extended option ZOOM).
+pub const ZOOMS: [u8; 3] = [100, 75, 50];
+
 /// Options from the command line / config.
 #[derive(Clone, Default)]
 pub struct Options {
@@ -27,6 +30,14 @@ pub struct Options {
     /// extended option SHOW INVENTORY off: no items box at the bottom right
     /// (it is only shown in extended mode; config.txt `showinventory`)
     pub hide_inventory: bool,
+    /// extended option ZOOM: the play field zoomed out to 75 or 50 percent
+    /// (0 = 100, the original size; config.txt `zoom`, `+`/`-` keys)
+    pub zoom: u8,
+    /// --zoom N given (and not changed in the game since): config.txt's
+    /// zoom is neither used nor overwritten
+    pub zoom_given: bool,
+    /// the zoom of config.txt (kept there while `zoom_given`)
+    pub zoom_config: u8,
     /// --no-auto-save: no AUTOSAVE.CKn while playing / resume at start
     pub no_auto_save: bool,
     /// --classic: the game as it was; implies classic_view and

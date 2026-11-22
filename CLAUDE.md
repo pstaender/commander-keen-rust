@@ -94,11 +94,19 @@ runtime and are never committed.
   intro (Terminator, `ega_render_wide` paints beyond the 320 EGA view) and
   the control panel (`Surface::extend_edges` continues the arm) and the
   Keen 4/5 help screens (background only) go wide
-  (`Game::set_screen_width`); title, story etc. stay 320. The help menu's
+  (`Game::set_screen_width`); title, story etc. stay 320. Zoom (extended
+  option ZOOM, `-`/`+`, `--zoom`, `Options::zoom`, `Game::zoom()`): the
+  view is also taller (`Camera::view_h`, `tall()`, `extra_y()`; 400 lines
+  at 50 %), 320x200 drawing is centered vertically with `Surface::yoff`;
+  vertical scroll blocks/centering follow the wide rules, `fall_line()`
+  keeps the original death line. `MARKER_TILES` (rf.rs: BLOCK, EDGE /
+  BOTTOM OF MAP foreground tiles) are drawn black in wide/zoomed views.
+  The help menu's
   hand can point at the HELP! title: `NEW_HELP` in text.rs, the pages about
   this version (keep it current when adding features).
 - Two player mode (`src/game/mp.rs`, CONFIGURE > USE GAMEPAD > TWO
-  PLAYERS, offered when a gamepad is detected, config `twoplayers`; switched
+  PLAYERS, or EXTENDED OPTIONS > TWO PLAYERS; offered when a gamepad is
+  detected, config `twoplayers`; switched
   on by itself when two gamepads show up in the first seconds,
   `Input::two_pads_at_start`, `mp_auto_enable`): a second Keen object in
   levels (not in demos, not with --classic, needs a gamepad); on the world

@@ -279,6 +279,9 @@ impl Game {
         } else {
             o.bottom - 0x8c0
         };
+        // zoomed out: Keen as far from the bottom edge as in the original
+        // view, i.e. lower by half the extra height (0 for 200 lines)
+        let y = if self.cam.tall() { (y - self.cam.extra_y() / 2).max(0) } else { y };
         if !self.scrolllock_rf {
             self.rf_new_position(x, y);
         }
@@ -293,6 +296,7 @@ impl Game {
         let o = &self.objs[ob];
         let c = &self.cam;
         let half = c.extra() / 2;
+        let hy = c.extra_y() / 2;
         let dx = if (o.left as u16) < (c.originxglobal + 0x900 + half) as u16 {
             o.left - (c.originxglobal + 0x900 + half)
         } else if ((c.originxglobal + 0xc00 + half) as u16) < o.right as u16 {
@@ -300,16 +304,27 @@ impl Game {
         } else {
             0
         };
-        let dy = if (o.top as u16) < (c.originyglobal + 0x500) as u16 {
-            o.top - (c.originyglobal + 0x500)
-        } else if ((c.originyglobal + 0x700) as u16) < o.bottom as u16 {
-            o.bottom - (c.originyglobal + 0x700)
+        let dy = if (o.top as u16) < (c.originyglobal + 0x500 + hy) as u16 {
+            o.top - (c.originyglobal + 0x500 + hy)
+        } else if ((c.originyglobal + 0x700 + hy) as u16) < o.bottom as u16 {
+            o.bottom - (c.originyglobal + 0x700 + hy)
         } else {
             0
         };
         if dx != 0 || dy != 0 {
             self.rf_scroll(dx.clamp(-255, 255), dy.clamp(-255, 255));
             self.update_active_bounds();
+        }
+    }
+
+    /// Keen falls out of the map below this bottom (originymax + 0xd00,
+    /// i.e. the bottom scroll block; for a zoomed out view, where
+    /// originymax is smaller, from the map's height).
+    pub fn fall_line(&self) -> i32 {
+        if self.cam.tall() {
+            (self.mapheight - 2) * 256
+        } else {
+            self.cam.originymax + 0xd00
         }
     }
 
@@ -327,8 +342,9 @@ impl Game {
             self.playstate = EX_COMPLETED;
             return;
         }
-        if ((c.originymax + 0xd00) as u16) < o.bottom as u16 {
-            self.objs[ob].y -= o.bottom - (c.originymax + 0xd00);
+        let fall = self.fall_line();
+        if (fall as u16) < o.bottom as u16 {
+            self.objs[ob].y -= o.bottom - fall;
             self.play_sound(super::keen::SND_PLUMMET);
             self.godmode = false;
             self.kill_keen();
@@ -373,7 +389,8 @@ impl Game {
             && !same(o.state, &S_KEENCLIMBUP4)
         {
             dy += o.ymove;
-            let target = c.originyglobal + dy + self.centerlevel * 16;
+            // (zoomed out: lower by half the extra height)
+            let target = c.originyglobal + dy + self.centerlevel * 16 + c.extra_y() / 2;
             self.scroll_target_last = target;
             if o.bottom as u16 != target as u16 {
                 let diff = if (o.bottom as u16) < target as u16 { target - o.bottom } else { o.bottom - target };
@@ -397,7 +414,7 @@ impl Game {
         if d < 0 {
             dy += d;
         }
-        let d = (o.bottom + 0x200) - (c.originyglobal + dy + 0xc80);
+        let d = (o.bottom + 0x200) - (c.originyglobal + dy + 0xc80 + c.extra_y());
         if d > 0 {
             dy += d;
         }
@@ -568,6 +585,8 @@ impl Game {
             self.wait_ack();
             self.opts.debug = true;
         }
+        // (zoomed out: hanging from the top of the view, not centered)
+        let yoff = std::mem::take(&mut self.sys.surface.yoff);
         self.draw_playfield();
         // render the status window into its own surface
         let saved = self.sys.surface.px.clone();
@@ -598,6 +617,7 @@ impl Game {
             }
             pos = (pos - self.tics * 8).max(0);
         }
+        self.sys.surface.yoff = yoff;
         self.objs[self.scoreobj].x = 0;
     }
 
@@ -726,6 +746,15 @@ impl Game {
                 self.rf_force_refresh();
                 self.sys.input.clear_keys_down();
                 self.lasttimecount = self.sys.time_count();
+            }
+        }
+        // extended mode: - zooms the play field out (75, 50 percent), + back in
+        if self.opts.cheatmode && !self.opts.classic && self.demomode == 0 && !self.storedemo {
+            let out = matches!(ls, 0x0c | 0x4a);
+            if out || matches!(ls, 0x0d | 0x4e) {
+                self.step_zoom(out);
+                self.sys.input.last_scan = 0;
+                self.save_config();
             }
         }
         self.autosave_tick();

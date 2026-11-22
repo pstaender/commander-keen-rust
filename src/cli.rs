@@ -23,6 +23,8 @@ const USAGE: &str = "keenN [options]
   --window-scale N   window size multiplier (default 3)
   --no-fullscreen    start in a window (default: fullscreen; F11 or
                      Cmd/Win+F toggles)
+  --zoom PERCENT     play field zoom: 100 (default), 75 or 50 shows more
+                     of the level (extended option ZOOM, - and + keys)
   --no-aspect        do not stretch to 4:3
   --classic          the game as it was: no widescreen, no MIDI music, no
                      volume settings, no autosave and no quick save
@@ -95,6 +97,16 @@ pub fn main(default_dir: &str) {
             "--classic-view" => opts.classic_view = true,
             "--classic" => opts.classic = true,
             "--no-auto-save" => opts.no_auto_save = true,
+            "--zoom" => {
+                let v = next(&mut i);
+                match v.trim_end_matches('%').parse::<u8>() {
+                    Ok(z) if crate::options::ZOOMS.contains(&z) => {
+                        opts.zoom = z;
+                        opts.zoom_given = true;
+                    }
+                    _ => eprintln!("unknown zoom {} (100, 75 or 50)", v),
+                }
+            }
             "--difficulty" => {
                 opts.start_difficulty = match next(&mut i).to_ascii_lowercase().as_str() {
                     "easy" | "1" => Some(1),

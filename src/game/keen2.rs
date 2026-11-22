@@ -56,8 +56,10 @@ impl Game {
         }
         // drawn at the top left of the (possibly wide) play field
         let xoff = std::mem::take(&mut self.sys.surface.xoff);
+        let yoff = std::mem::take(&mut self.sys.surface.yoff);
         self.draw_score_box_at();
         self.sys.surface.xoff = xoff;
+        self.sys.surface.yoff = yoff;
     }
 
     fn draw_score_box_at(&mut self) {
@@ -124,7 +126,7 @@ impl Game {
         let n = items.len() as i32;
         let (w, h) = (n * 9 + 3, 12);
         let x = self.cam.view_w() - w - 5;
-        let y = 200 - h - 5;
+        let y = self.cam.view_hpx() - h - 5;
         self.sys.surface.bar(x - 1, y - 1, w + 2, h + 2, 8);
         self.sys.surface.bar(x, y, w, h, 0);
         for (i, it) in items.into_iter().enumerate() {

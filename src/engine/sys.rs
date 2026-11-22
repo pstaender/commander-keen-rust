@@ -374,6 +374,16 @@ impl Sys {
         (w & !1).clamp(SCREEN_W, MAX_VIEW_W)
     }
 
+    /// Logical size of a play field view zoomed out to `zoom` percent
+    /// (100 = `wide_width()` x 200): 200 * 100 / zoom lines high, as wide
+    /// as the window's shape allows.
+    pub fn zoomed_size(&self, zoom: u32) -> (usize, usize) {
+        let zoom = zoom.clamp(50, 100) as usize;
+        let h = (200 * 100 / zoom) & !1;
+        let w = (self.wide_width() * h / 200) & !1;
+        (w, h)
+    }
+
     /// Whether the window is in fullscreen mode.
     pub fn fullscreen(&self) -> bool {
         self.win.as_ref().map_or(self.fullscreen_pref, |(_, w)| w.fullscreen)
@@ -717,7 +727,7 @@ impl Sys {
                 if surf.resize(ww, wh).is_ok() {
                     if let Ok(mut buf) = surf.buffer_mut() {
                         let disp_w = s.logical_w();
-                        let disp_h = if self.fullscreen_aspect { 240 } else { 200 };
+                        let disp_h = if self.fullscreen_aspect { s.logical_h() * 6 / 5 } else { s.logical_h() };
                         scale_into(&mut buf, size.width as usize, size.height as usize, src, s.w, s.h, disp_w, disp_h, border);
                         let _ = buf.present();
                     }

@@ -77,6 +77,9 @@ pub struct Surface {
     /// 320x200 screens and windows are centered in a wider view, the play
     /// field and the score box draw at 0
     pub xoff: i32,
+    /// logical y offset, like `xoff`: a zoomed out play field is taller
+    /// than 200, the 320x200 windows are centered in it
+    pub yoff: i32,
     /// clip rectangle in physical pixels
     clip: (i32, i32, i32, i32),
 }
@@ -85,7 +88,7 @@ impl Surface {
     pub fn new(scale: usize) -> Surface {
         let w = SCREEN_W * scale;
         let h = SCREEN_H * scale;
-        Surface { scale, w, h, px: vec![0xff000000; w * h], xoff: 0, clip: (0, 0, w as i32, h as i32) }
+        Surface { scale, w, h, px: vec![0xff000000; w * h], xoff: 0, yoff: 0, clip: (0, 0, w as i32, h as i32) }
     }
 
     /// Logical width (320 for the original view, wider for widescreen).
@@ -93,12 +96,26 @@ impl Surface {
         self.w / self.scale
     }
 
+    /// Logical height (200, taller for a zoomed out play field).
+    pub fn logical_h(&self) -> usize {
+        self.h / self.scale
+    }
+
     /// Changes the logical width; the content is cleared and 320 wide
     /// drawing gets centered.
     pub fn set_width(&mut self, lw: usize) {
+        let lh = self.logical_h();
+        self.set_size(lw, lh);
+    }
+
+    /// Changes the logical size; the content is cleared and 320x200
+    /// drawing gets centered.
+    pub fn set_size(&mut self, lw: usize, lh: usize) {
         self.w = lw * self.scale;
+        self.h = lh * self.scale;
         self.px = vec![0xff000000; self.w * self.h];
         self.xoff = (lw as i32 - SCREEN_W as i32) / 2;
+        self.yoff = (lh as i32 - SCREEN_H as i32) / 2;
         self.reset_clip();
     }
 
@@ -128,6 +145,7 @@ impl Surface {
     pub fn set_clip(&mut self, x: i32, y: i32, w: i32, h: i32) {
         let s = self.scale as i32;
         let x = x + self.xoff;
+        let y = y + self.yoff;
         let x0 = (x * s).clamp(0, self.w as i32);
         let y0 = (y * s).clamp(0, self.h as i32);
         let x1 = ((x + w) * s).clamp(0, self.w as i32);
@@ -152,6 +170,7 @@ impl Surface {
     pub fn bar_rgb(&mut self, x: i32, y: i32, w: i32, h: i32, c: u32) {
         let s = self.scale as i32;
         let x = x + self.xoff;
+        let y = y + self.yoff;
         let (cx0, cy0, cx1, cy1) = self.clip;
         let x0 = (x * s).max(cx0);
         let y0 = (y * s).max(cy0);
@@ -169,7 +188,7 @@ impl Surface {
     /// Draws a texture with its top-left corner at logical (x, y).
     pub fn blit(&mut self, t: &Tex, x: i32, y: i32) {
         let s = self.scale as i32;
-        self.blit_phys(t, (x + self.xoff) * s, y * s);
+        self.blit_phys(t, (x + self.xoff) * s, (y + self.yoff) * s);
     }
 
     /// Draws a texture at physical coordinates (used for sub-pixel
@@ -232,7 +251,7 @@ impl Surface {
                     continue;
                 }
                 for sy in 0..s {
-                    let yy = (y + gy) * s + sy;
+                    let yy = (y + self.yoff + gy) * s + sy;
                     if yy < cy0 || yy >= cy1 {
                         continue;
                     }
@@ -265,7 +284,7 @@ impl Surface {
                     continue;
                 }
                 for sy in 0..s {
-                    let yy = (y + gy) * s + sy;
+                    let yy = (y + self.yoff + gy) * s + sy;
                     if yy < cy0 || yy >= cy1 {
                         continue;
                     }
@@ -308,6 +327,7 @@ impl Surface {
         let s = self.scale as i32;
         let c = EGA_RGB[(color & 15) as usize];
         let x = x + self.xoff;
+        let y = y + self.yoff;
         for yy in (y * s).max(0)..((y + h) * s).min(self.h as i32) {
             for xx in (x * s).max(0)..((x + w) * s).min(self.w as i32) {
                 let p = &mut self.px[yy as usize * self.w + xx as usize];
@@ -320,6 +340,7 @@ impl Surface {
     pub fn copy_from(&mut self, other: &Surface, x: i32, y: i32, w: i32, h: i32) {
         let s = self.scale as i32;
         let x = x + self.xoff;
+        let y = y + self.yoff;
         for yy in (y * s).max(0)..((y + h) * s).min(self.h as i32) {
             let row = yy as usize * self.w;
             let x0 = (x * s).max(0) as usize;

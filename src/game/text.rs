@@ -71,6 +71,12 @@ Keen no longer has to peek at his world through a little box. Make the window as
 
 Press F11 (or Cmd+F on a Mac, Win+F on Windows) to switch between a window and fullscreen.
 ^P
+{D}{H}ZOOM
+{B}
+Want to see even more? Press the minus key while you play to zoom out to 75 or 50 percent, and the plus key to zoom back in. Everything gets smaller, but you can see much more of the level above, below and around Keen. That is handy with two players.
+
+You can also change Zoom under Extended Options. Keen remembers your choice.
+^P
 {D}{H}GAMEPADS
 {B}
 If you plug in a gamepad, the Configure menu shows Use Gamepad instead of the joystick choices. There you can set up the movement and the buttons for jump, pogo, fire, the ComputerWrist, saving and loading. Default Layout puts everything back the way it was.
@@ -85,7 +91,7 @@ No calibration is needed.  Even cheap gamepads that the computer doesn't know wo
 ^P
 {D}{H}TWO PLAYERS
 {B}
-Bring a friend! Turn on Two Players under Configure, Use Gamepad (it is on by itself when two gamepads are plugged in at the start). In the levels a second Keen joins in: player 1 uses the gamepad, player 2 a second gamepad or the keyboard. Player 2 wears a blue helmet and a green shirt. On the world map he tags along behind player 1.
+Bring a friend! Turn on Two Players under Configure, Use Gamepad or under Extended Options (it is on by itself when two gamepads are plugged in at the start). In the levels a second Keen joins in: player 1 uses the gamepad, player 2 a second gamepad or the keyboard. Player 2 wears a blue helmet and a green shirt. On the world map he tags along behind player 1.
 
 The view follows player 1. If player 2 is lost off the screen, he is brought back. Keys, gems and lives are shared (you start with twice as many lives), shots you find go to both, but each Keen keeps his own score.
 ^P

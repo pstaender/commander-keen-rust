@@ -109,7 +109,9 @@ const JERKCARD: usize = 18;
 /// main menu and holds it as its last entry)
 const CHEATCARD: usize = 19;
 /// the END GAME entry of the extended options card
-const CHEAT_ENDGAME_ITEM: usize = 6;
+const CHEAT_ENDGAME_ITEM: usize = 8;
+/// the TWO PLAYERS entry of the extended options card (needs a gamepad)
+const CHEAT_TWOPLAYERS_ITEM: usize = 7;
 /// a gamepad is connected: "USE GAMEPAD" (replaces the joystick entries
 /// of the config card) and its movement / button binding cards
 const PADCARD: usize = 20;
@@ -361,6 +363,8 @@ fn build_cards() -> Vec<Card> {
                 b(0x16, "UNLIMITED LIVES", 0),
                 b(0x1e, "UNLIMITED AMMO", 0),
                 b(0x17, "SHOW INVENTORY", 0),
+                b(0x2c, "ZOOM", 0),
+                b(0x14, "TWO PLAYERS", 0),
                 b(0x12, "END GAME", 2),
             ],
             Custom::Cheat,
@@ -1527,6 +1531,13 @@ impl Game {
                         it.flags |= UI_DISABLED;
                     }
                 }
+                // two player mode needs a gamepad (player 1's)
+                let it = &mut self.menu.cards[CHEATCARD].items[CHEAT_TWOPLAYERS_ITEM];
+                if self.sys.input.pad_connected {
+                    it.flags &= !UI_DISABLED;
+                } else {
+                    it.flags |= UI_DISABLED;
+                }
                 false
             }
             UIC_TOUCHUPCARD => {
@@ -1542,6 +1553,8 @@ impl Game {
                     3 => format!("UNLIMITED LIVES [{}]", if self.opts.unlimited_lives { "X" } else { " " }),
                     4 => format!("UNLIMITED AMMO [{}]", if self.opts.unlimited_ammo { "X" } else { " " }),
                     5 => format!("SHOW INVENTORY [{}]", if self.opts.hide_inventory { " " } else { "X" }),
+                    6 => format!("ZOOM [{}%]", self.zoom()),
+                    7 => format!("TWO PLAYERS [{}]", if self.mp.enabled { "X" } else { " " }),
                     _ => return false,
                 };
                 self.usl_draw_item_text(i, &text);
@@ -1557,6 +1570,19 @@ impl Game {
                     3 => self.opts.unlimited_lives = !self.opts.unlimited_lives,
                     4 => self.opts.unlimited_ammo = !self.opts.unlimited_ammo,
                     5 => self.opts.hide_inventory = !self.opts.hide_inventory,
+                    // 100 -> 75 -> 50 -> 100 (applied when the game goes on)
+                    6 => {
+                        let zs = crate::options::ZOOMS;
+                        let i = zs.iter().position(|&z| z == self.zoom()).unwrap_or(0);
+                        self.opts.zoom = zs[(i + 1) % zs.len()];
+                        self.opts.zoom_given = false;
+                    }
+                    // two player mode (from the next level on), the same
+                    // switch as in CONFIGURE > USE GAMEPAD
+                    7 => {
+                        self.mp.enabled = !self.mp.enabled;
+                        self.usl_set_options_text();
+                    }
                     _ => {
                         self.opts.allow_reenter = !self.opts.allow_reenter;
                         // on the world map the level entries change at once
@@ -3053,6 +3079,12 @@ impl Game {
                 "unlimitedammo" => self.opts.unlimited_ammo = n == 1,
                 "allowreenter" => self.opts.allow_reenter = n == 1,
                 "showinventory" => self.opts.hide_inventory = n == 0,
+                "zoom" if crate::options::ZOOMS.contains(&(n as u8)) && n <= 100 => {
+                    self.opts.zoom_config = n as u8;
+                    if !self.opts.zoom_given {
+                        self.opts.zoom = n as u8;
+                    }
+                }
                 "controltype" => self.menu.controltype = 0,
                 "button0" => d.button0 = sc.unwrap_or(d.button0),
                 "button1" => d.button1 = sc.unwrap_or(d.button1),
@@ -3119,11 +3151,15 @@ impl Game {
         }
         text += &format!("twoplayers={}\n", b(self.mp.enabled));
         text += &format!(
-            "unlimitedlives={}\nunlimitedammo={}\nallowreenter={}\nshowinventory={}\n",
+            "unlimitedlives={}\nunlimitedammo={}\nallowreenter={}\nshowinventory={}\nzoom={}\n",
             b(self.opts.unlimited_lives),
             b(self.opts.unlimited_ammo),
             b(self.opts.allow_reenter),
-            b(!self.opts.hide_inventory)
+            b(!self.opts.hide_inventory),
+            {
+                let z = if self.opts.zoom_given { self.opts.zoom_config } else { self.opts.zoom };
+                if crate::options::ZOOMS.contains(&z) { z } else { 100 }
+            }
         );
         for (k, p) in PAD_ACTION_KEYS.iter().zip(self.sys.input.pad_map) {
             text += &format!("{}={}\n", k, p.encode());

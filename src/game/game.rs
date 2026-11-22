@@ -6,6 +6,7 @@ use super::play::{LEVELENTER, LEVELNAMES};
 use super::Game;
 use super::EPISODE as EPISODE_NUM;
 use crate::engine::input::*;
+use crate::options::ZOOMS;
 
 impl Game {
     /// NewGame (0x1584e)
@@ -88,6 +89,25 @@ impl Game {
     /// Extended option UNLIMITED AMMO (like UNLIMITED LIVES).
     pub fn unlimited_ammo(&self) -> bool {
         self.opts.unlimited_ammo && self.opts.cheatmode && self.demomode == 0
+    }
+
+    /// Play field zoom in percent (extended option ZOOM): 100, 75 or 50;
+    /// always 100 with --classic (demos and --classic-view keep the
+    /// original view anyway, see `update_view`).
+    pub fn zoom(&self) -> u8 {
+        if !self.opts.cheatmode || self.opts.classic || !ZOOMS.contains(&self.opts.zoom) {
+            100
+        } else {
+            self.opts.zoom
+        }
+    }
+
+    /// Steps the zoom (`out`: towards 50 percent) and applies it.
+    pub fn step_zoom(&mut self, out: bool) {
+        let i = ZOOMS.iter().position(|&z| z == self.zoom()).unwrap_or(0);
+        let i = if out { (i + 1).min(ZOOMS.len() - 1) } else { i.saturating_sub(1) };
+        self.opts.zoom = ZOOMS[i];
+        self.opts.zoom_given = false;
     }
 
     /// Extended options card: adds or removes the entries of finished levels on the

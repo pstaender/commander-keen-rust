@@ -39,7 +39,7 @@ Play in widescreen mode:
 
 <img width="1840" height="864" alt="widescreen" src="https://github.com/user-attachments/assets/7a850433-dee2-4e36-bdd2-6334ec218613" />
 
-Adding additional lives and armor, unlimited lives and ammo (the score box then leaves those counters empty) and replay completed levels with the extended options (EXTENDED OPTIONS in the main menu, which also holds END GAME; the options are remembered in `config.txt`; off with `--classic`):
+Adding additional lives and armor, unlimited lives and ammo (the score box then leaves those counters empty), zoom out the play field (see [Zoom](#zoom)), switch two player mode on or off (with a gamepad connected) and replay completed levels with the extended options (EXTENDED OPTIONS in the main menu, which also holds END GAME; the options are remembered in `config.txt`; off with `--classic`):
 
 <img width="1072" height="864" alt="cheat_options" src="https://github.com/user-attachments/assets/ac6dac4f-fc06-4eba-93f7-c414dfdfd283" />
 
@@ -88,7 +88,8 @@ case-insensitively.
 | `--no-fullscreen` | start in a window; by default the game starts fullscreen, also with `--classic` |
 | `--no-aspect` | don't stretch 320×200 to 4:3 |
 | `--classic` | the game as it was: no widescreen (play field, intro, menu), no MIDI music, no volume settings, no autosave and no quick save (gamepad save/load state, load menu page 2, F2/F3), no extended options |
-| `--classic-view` | keep the original 320×200 play field instead of widening it to the screen |
+| `--classic-view` | keep the original 320×200 play field instead of widening it to the screen (and no zoom) |
+| `--zoom PERCENT` | play field zoom: `100` (default), `75` or `50` (see [Zoom](#zoom)) |
 | `--no-auto-save` | turn off the autosave (every 5 s to `saves/AUTOSAVE.CKn`; after a crash, kill or quit the game offers to resume it at the next start) |
 | `--system-shortcuts` | macOS: keep the system keyboard shortcuts active while the game has focus (see below) |
 | `--nosound` | disable audio output |
@@ -112,6 +113,7 @@ The defaults are the original ones and can be changed in the in-game menu
 | Enter | status window |
 | Esc / F2–F7 | control panel (new game, load/save, options, …); in Keen 6 also F1 |
 | F1 (Keen 4/5) | help screens; move the hand up onto the HELP! title and press Enter for a help section about everything new in this version (not with `--classic`) |
+| `-` / `+` | zoom the play field out / in (100, 75, 50 %; not with `--classic`) |
 | Pause | pause |
 | Ctrl+Q | quit |
 | F11 or Cmd+F (macOS) / Win+F | toggle fullscreen |
@@ -205,6 +207,26 @@ immediately.
 - Recorded demos (attract mode, `--demo`, F10+D) always use the original 320
   width so they stay in sync.
 - `--classic-view` keeps the original 320 view everywhere.
+
+## Zoom
+
+The play field can be zoomed out to 75 or 50 percent, which shows more of
+the level in every direction (at 50 % on a 16:9 screen about 852×400 pixels
+instead of 426×200). This helps especially in two player mode. Press `-`
+and `+` while playing, or change ZOOM in EXTENDED OPTIONS; the setting is
+remembered in `config.txt`. `--zoom 50` sets it for one session only.
+
+- It works like the widescreen view in both directions: enemies wake up
+  when they come into the larger view, and rooms smaller than the view are
+  centered with black around them. Falling out of the map happens at the
+  same place as at 100 %.
+- The marker tiles the level designers left where the original view never
+  looks ("BLOCK", "EDGE OF MAP", "BOTTOM OF MAP") are drawn black in the
+  wide and zoomed out views.
+- The score box, the inventory, dialogs and the status window keep their
+  pixel size, so they look smaller on screen. The status window hangs from
+  the top of the view.
+- Demos, `--classic` and `--classic-view` always use 100 %.
 
 ## Commander Keen Editor
 
