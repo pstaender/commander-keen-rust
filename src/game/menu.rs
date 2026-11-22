@@ -356,6 +356,7 @@ fn build_cards() -> Vec<Card> {
                 b(0x1f, "ADD EXTRA SHOT", 0),
                 b(0x13, "ALLOW RE-ENTER", 0),
                 b(0x16, "UNLIMITED LIVES", 0),
+                b(0x17, "SHOW INVENTORY", 0),
             ],
             Custom::Cheat,
             0,
@@ -1532,7 +1533,8 @@ impl Game {
                     0 => format!("ADD EXTRA LIFE [{}]", self.gs.lives),
                     1 => format!("ADD EXTRA SHOT [{}]", self.gs.ammo),
                     2 => format!("ALLOW RE-ENTER [{}]", if self.opts.allow_reenter { "X" } else { " " }),
-                    _ => format!("UNLIMITED LIVES [{}]", if self.opts.unlimited_lives { "X" } else { " " }),
+                    3 => format!("UNLIMITED LIVES [{}]", if self.opts.unlimited_lives { "X" } else { " " }),
+                    _ => format!("SHOW INVENTORY [{}]", if self.opts.hide_inventory { " " } else { "X" }),
                 };
                 self.usl_draw_item_text(i, &text);
                 true
@@ -1543,6 +1545,7 @@ impl Game {
                     0 => self.gs.lives = (self.gs.lives + 1).min(CHEATMAX),
                     1 => self.gs.ammo = (self.gs.ammo + 1).min(CHEATMAX),
                     3 => self.opts.unlimited_lives = !self.opts.unlimited_lives,
+                    4 => self.opts.hide_inventory = !self.opts.hide_inventory,
                     _ => {
                         self.opts.allow_reenter = !self.opts.allow_reenter;
                         // on the world map the level entries change at once

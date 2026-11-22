@@ -78,6 +78,50 @@ impl Game {
             let w = self.gfx.sprites.get(idx).map_or(0, |t| t.w as i32 / scale);
             let x = self.cam.view_w() - w - 4;
             self.draw_score_box_for(x, score, ammo, true);
+            if !self.opts.hide_inventory {
+                self.draw_items_box();
+            }
+        }
+    }
+
+    /// Two player mode: the items both players share for getting through
+    /// the level (gems; Keen 5 the keycard, Keen 6 the sandwich, rope
+    /// and passcard), centered between the score boxes (unless switched
+    /// off: cheat option SHOW INVENTORY). The icons of the
+    /// status window; an empty slot is a small gray square. On the world
+    /// map only what is used there (Keen 6's special items): gems and
+    /// keycard only open doors in levels.
+    fn draw_items_box(&mut self) {
+        let level = self.gs.mapon != 0;
+        let mut items: Vec<Option<i32>> = Vec::new();
+        if level {
+            items.extend((0..4).map(|i| (self.gs.keys[i] > 0).then_some(0x24 + i as i32)));
+            ep5! {
+                items.push((self.gs.keycard != 0).then_some(0x28));
+            }
+        }
+        ep6! {
+            items.push((self.gs.sandwichstate == 1).then_some(2));
+            items.push((self.gs.hookstate == 1).then_some(4));
+            items.push((self.gs.passcardstate == 1).then_some(6));
+        }
+        if items.is_empty() {
+            return;
+        }
+        // 8 pixel icons 2 pixels apart, 3 pixels border, as high as the
+        // middle of the score boxes (32 pixels from y 4)
+        let n = items.len() as i32;
+        let (w, h) = (n * 10 + 4, 14);
+        let x = (self.cam.view_w() - w) / 2;
+        let y = 4 + (32 - h) / 2;
+        self.sys.surface.bar(x - 1, y - 1, w + 2, h + 2, 8);
+        self.sys.surface.bar(x, y, w, h, 0);
+        for (i, it) in items.into_iter().enumerate() {
+            let ix = x + 3 + i as i32 * 10;
+            match it {
+                Some(t) => self.draw_tile8(ix, y + 3, t),
+                None => self.sys.surface.bar(ix + 2, y + 5, 4, 4, 8),
+            }
         }
     }
 
