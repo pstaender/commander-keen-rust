@@ -3036,11 +3036,6 @@ impl Game {
                 "musicvolume" if (0..=100).contains(&n) => self.menu.music_volume = n as u8,
                 "quietadlib" => quiet = n == 1,
                 "showscorebox" => self.showscorebox = n == 1,
-                "fullscreen" => {
-                    if self.opts.fullscreen.is_none() {
-                        self.sys.set_fullscreen(n == 1);
-                    }
-                }
                 "compatibility" => self.menu.compatibility = n == 1,
                 "jerk" => self.menu.jerk = n == 1,
                 "twobutton" => self.twobutton = n == 1,
@@ -3081,7 +3076,7 @@ impl Game {
             "# Commander Keen {} configuration\n\
              sound={}\nmusic={}\nquietadlib={}\nshowscorebox={}\ncompatibility={}\ntwobutton={}\ncontroltype={}\n\
              button0={}\nbutton1={}\nupleft={}\nup={}\nupright={}\nleft={}\nright={}\ndownleft={}\ndown={}\ndownright={}\n\
-             firescan={}\nfullscreen={}\nsoundvolume={}\nmusicvolume={}\n",
+             firescan={}\nsoundvolume={}\nmusicvolume={}\n",
             super::EPISODE,
             self.sound_mode_num(),
             // with --classic MIDI falls back to AdLib but stays chosen
@@ -3102,7 +3097,6 @@ impl Game {
             d.down,
             d.downright,
             self.firescan,
-            b(self.sys.fullscreen()),
             self.menu.sfx_volume,
             self.menu.music_volume
         );

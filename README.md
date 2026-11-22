@@ -73,7 +73,7 @@ case-insensitively.
 | `--soundfont FILE` | SoundFont (`.sf2`) for the MIDI music and `.mid` replacement music (default: the first `.sf2` found, see below) |
 | `--export-midi DIR` | write all songs as `DIR/music/NN.mid` plus `DIR/instruments.txt` and exit |
 | `--window-scale N` | window size multiplier (default 3) |
-| `--fullscreen` / `--windowed` | start fullscreen or in a window (otherwise the last used mode from `config.txt`) |
+| `--no-fullscreen` | start in a window; by default the game starts fullscreen, also with `--classic` |
 | `--no-aspect` | don't stretch 320×200 to 4:3 |
 | `--classic` | the game as it was: no widescreen (play field, intro, menu), no MIDI music, no volume settings, no autosave and no quick save (gamepad save/load state, load menu page 2, F2/F3), no extended options |
 | `--classic-view` | keep the original 320×200 play field instead of widening it to the screen |
@@ -166,7 +166,7 @@ does not react, `KEEN_PAD_DEBUG=1` prints what it sends.
   left/right) to turn the page.
 - F2 saves to and F3 loads the slot last saved or loaded, without asking
   (not with `--classic`).
-- Settings (sound mode, key bindings, gamepad, fullscreen) and high scores are stored in
+- Settings (sound mode, key bindings, gamepad) and high scores are stored in
   `config.txt` in the data directory, so each episode has its own.
 
 ## Widescreen

@@ -19,7 +19,7 @@ runtime and are never committed.
   `exe.rs` locates the headers linked into the executable.
 - `src/engine/` – platform layer (ID_* managers): `sys.rs` window/time
   (winit + softbuffer, events pumped from the game loop, letterboxed
-  scaling, F11 fullscreen, 70 Hz TimeCount), `video.rs` scalable 32-bit surface in logical
+  scaling, fullscreen by default (--no-fullscreen, F11 toggles), 70 Hz TimeCount), `video.rs` scalable 32-bit surface in logical
   320x200 coordinates + EGA palette fades, `gfx.rs` texture sets and
   high-res replacement packs, `sound.rs` ID_SD emulation (560/140 Hz timing,
   OPL2 via `oplon`, PC speaker) with replacement audio (rodio, rustysynth),

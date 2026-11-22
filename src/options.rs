@@ -12,8 +12,6 @@ pub struct Options {
     pub play_demo: Option<usize>,
     /// a demo file recorded with F10+D (DEMOn.CK6) to play and exit
     pub demo_file: Option<std::path::PathBuf>,
-    /// --fullscreen / --windowed (otherwise the config.txt setting)
-    pub fullscreen: Option<bool>,
     /// --classic-view: always the original 320 pixel wide play field
     pub classic_view: bool,
     /// extended mode (on unless --classic): EXTENDED OPTIONS replaces END

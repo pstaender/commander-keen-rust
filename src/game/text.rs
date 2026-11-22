@@ -112,8 +112,7 @@ The Sound and Music menus both have a Volume bar. Move to it and press the left 
 {D}{H}COMMAND LINE PARAMETERS
 {B}
 Here are some new command line parameters:
-  {K} --fullscreen  (Start in fullscreen.)
-  {K} --windowed  (Start in a window.)
+  {K} --no-fullscreen  (Start in a window.)
   {K} --window-scale 4  (Make the window four times as big.)
   {K} --classic-view  (Keep the original narrow view.)
   {K} --classic  (Play the game just as it was in 1991, with none of the new features.)

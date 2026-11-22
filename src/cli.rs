@@ -19,8 +19,8 @@ const USAGE: &str = "keenN [options]
   --export-midi DIR  write the songs as DIR/music/NN.mid (DIR can be used
                      as --audio-pack after editing them) and exit
   --window-scale N   window size multiplier (default 3)
-  --fullscreen       start in fullscreen mode (F11 or Cmd/Win+F toggles)
-  --windowed         start in a window
+  --no-fullscreen    start in a window (default: fullscreen; F11 or
+                     Cmd/Win+F toggles)
   --no-aspect        do not stretch to 4:3
   --classic          the game as it was: no widescreen, no MIDI music, no
                      volume settings, no autosave and no quick save
@@ -63,6 +63,7 @@ pub fn main(default_dir: &str) {
     let mut system_shortcuts = false;
     let mut maps_dir: Option<PathBuf> = None;
     let mut headless = false;
+    let mut fullscreen = true;
     let mut opts = Options::default();
     let mut i = 1;
     let next = |i: &mut usize| -> String {
@@ -84,8 +85,7 @@ pub fn main(default_dir: &str) {
             "--system-shortcuts" => system_shortcuts = true,
             "--headless" => headless = true,
             "--debug" | "--debug-shortcuts" => opts.debug = true,
-            "--fullscreen" => opts.fullscreen = Some(true),
-            "--windowed" => opts.fullscreen = Some(false),
+            "--no-fullscreen" => fullscreen = false,
             "--classic-view" => opts.classic_view = true,
             "--classic" => opts.classic = true,
             "--no-auto-save" => opts.no_auto_save = true,
@@ -178,7 +178,7 @@ pub fn main(default_dir: &str) {
     if !opts.classic {
         sd.allow_midi(load_instrument_table(audio_pack.as_deref()));
     }
-    let mut sys = Sys::new(scale, window_scale.max(1), headless, aspect, opts.fullscreen.unwrap_or(false));
+    let mut sys = Sys::new(scale, window_scale.max(1), headless, aspect, fullscreen);
     sys.set_grab_hotkeys(!system_shortcuts);
     match data.episode {
         Episode::K4 => crate::ck4::run(sys, data, gfx, sd, opts),

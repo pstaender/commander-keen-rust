@@ -109,6 +109,7 @@ impl Project {
         let exe = format!("keen{}", lay.number);
         let game = game_binary(&exe).ok_or(format!("the game executable ({}) was not found next to the editor", exe))?;
         std::process::Command::new(&game)
+            .arg("--no-fullscreen")
             .arg("--data")
             .arg(&self.data_dir)
             .arg("--maps")
