@@ -93,7 +93,7 @@ No calibration is needed.  Even cheap gamepads that the computer doesn't know wo
 {B}
 Bring your friends! Choose up to four Players under Extended Options or Configure, Use Gamepad (two players are chosen by themselves when two gamepads are plugged in at the start). Every player needs a gamepad, except the last one, who may use the keyboard.
 
-Player 2 wears a blue helmet and a green shirt, player 3 a yellow shirt and player 4 a red one. On the world map they tag along behind player 1.
+Player 2 wears a blue helmet and a green shirt, player 3 a cyan shirt and player 4 a red one. On the world map they tag along behind player 1.
 ^P
 {D}{H}MORE PLAYERS (cont'd.)
 {B}

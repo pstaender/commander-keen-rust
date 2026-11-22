@@ -175,9 +175,9 @@ one without a gamepad with the keyboard:
 | 3 | 2 gamepads | gamepad 1 | gamepad 2 | gamepad 3 or keyboard | |
 | 4 | 3 gamepads | gamepad 1 | gamepad 2 | gamepad 3 | gamepad 4 or keyboard |
 
-- Player 2 wears a blue helmet with red stripes and a green shirt, player 3
-  a yellow helmet with red stripes and a yellow shirt, player 4 a blue
-  helmet with yellow stripes and a red shirt; all of them blue jeans. Each
+- Player 2 wears a blue helmet with light pink stripes and a green shirt, player 3
+  a red helmet with dark red stripes and a cyan shirt, player 4 a light
+  green helmet with dark green stripes and a red shirt; all of them blue jeans. Each
   has a score box in his colors.
 - The view follows the leading Keen (player 1). The others are brought back
   to him when they stay off screen, and come along through his doors.

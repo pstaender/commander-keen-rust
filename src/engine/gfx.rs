@@ -48,17 +48,17 @@ pub fn alt_tex(src: &Tex, n: usize) -> Tex {
 
 /// The colors of players 2, 3 and 4; all of them wear blue jeans (the cyan
 /// of Keen's trousers turns light blue, next to their dark blue).
-/// Player 2: the yellow helmet blue with light red stripes (green before),
-/// the pink shirt green. Player 3: the helmet yellow with red stripes, a
-/// yellow shirt. Player 4: the helmet blue with yellow stripes, a red
-/// shirt.
+/// Player 2: the yellow helmet blue with light pink stripes (green before),
+/// the pink shirt green. Player 3: the helmet red with dark red stripes, a
+/// cyan shirt. Player 4: the helmet light green with (Keen's own) dark
+/// green stripes, a red shirt.
 /// (EGA color, replacement) pairs, applied in one pass; a pixel near one
 /// of the EGA colors is moved by the same difference, so the shading of
 /// high resolution packs survives.
 const ALT_COLORS: [&[(u32, u32)]; 3] = [
-    &[(0xffff55, 0x3c3cdc), (0x00aa00, 0xff5555), (0xff55ff, 0x55ff55), (0xaa00aa, 0x00aa00), (0x55ffff, 0x5555ff)],
-    &[(0x00aa00, 0xff5555), (0xff55ff, 0xffffaa), (0xaa00aa, 0xffff55), (0x55ffff, 0x5555ff)],
-    &[(0xffff55, 0x3c3cdc), (0x00aa00, 0xffff55), (0xff55ff, 0xff5555), (0xaa00aa, 0xaa0000), (0x55ffff, 0x5555ff)],
+    &[(0xffff55, 0x3c3cdc), (0x00aa00, 0xff55ff), (0xff55ff, 0x55ff55), (0xaa00aa, 0x00aa00), (0x55ffff, 0x5555ff)],
+    &[(0xffff55, 0xff5555), (0x00aa00, 0xaa0000), (0xff55ff, 0x55ffff), (0xaa00aa, 0x00aaaa), (0x55ffff, 0x5555ff)],
+    &[(0xffff55, 0x55ff55), (0xff55ff, 0xff5555), (0xaa00aa, 0xaa0000), (0x55ffff, 0x5555ff)],
 ];
 
 fn alt_color(p: u32, table: &[(u32, u32)]) -> u32 {
