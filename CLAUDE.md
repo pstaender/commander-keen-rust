@@ -46,7 +46,15 @@ runtime and are never committed.
   `EP=N python3 -I tools/gen_states.py` from the state records in the
   executable; names in `tools/states_kN.py` and `tools/states_kN_<module>.py`).
 - `src/cli.rs` – the command line, shared by `src/bin/keen4.rs`,
-  `keen5.rs`, `keen6.rs`.
+  `keen5.rs`, `keen6.rs`. Without `--data` the data directory is also
+  looked up next to the executable, in `data/` there and in a macOS app
+  bundle (`GameData::write_dir`: saves/config then go to Application
+  Support).
+- Release builds: `.github/workflows/release.yml` (on a published
+  release; original data from archive.org, cached per half year, for the
+  tests/demo checks; only Keen 4 – shareware – is bundled). `icon.png` is
+  the window icon, the Windows exe icon (`build.rs`) and the macOS app icon
+  (`tools/make_icns.py`, `tools/make_app.sh`).
 - `editor/` – Commander Keen Editor (`keen-editor`, workspace member, all
   three episodes,
   eframe/egui + rfd): `project.rs` map set load/save/play test (runs the

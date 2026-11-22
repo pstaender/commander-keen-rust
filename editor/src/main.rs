@@ -1075,7 +1075,10 @@ fn main() -> eframe::Result {
         }
     };
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([1400.0, 900.0]).with_title("Commander Keen Editor"),
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([1400.0, 900.0])
+            .with_title("Commander Keen Editor")
+            .with_icon(eframe::icon_data::from_png_bytes(include_bytes!("../../icon.png")).unwrap_or_default()),
         ..Default::default()
     };
     eframe::run_native("Commander Keen Editor", options, Box::new(move |cc| Ok(Box::new(App::new(project, map, cc.storage)))))

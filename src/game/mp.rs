@@ -611,6 +611,7 @@ mod tests {
         let sys = Sys::new(1, 1, true, true, false);
         let mut g = Game::new(sys, data, gfx, sd, Default::default());
         g.data.dir = tmp.to_path_buf();
+        g.data.write_dir = tmp.to_path_buf();
         g.sys.input.pad_connected = true;
         g.mp.enabled = true;
         g.new_game();

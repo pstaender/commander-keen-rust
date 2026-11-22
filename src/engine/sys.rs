@@ -99,6 +99,7 @@ impl ApplicationHandler for Win {
         }
         let attrs = Window::default_attributes()
             .with_title(TITLE)
+            .with_window_icon(window_icon())
             .with_inner_size(self.size)
             .with_fullscreen(self.fullscreen.then_some(Fullscreen::Borderless(None)));
         let window = match el.create_window(attrs) {
@@ -891,4 +892,17 @@ mod tests {
         assert_eq!(dst[((1000 - 400) / 2) * dw], 1);
         assert_eq!(dst[((1000 - 400) / 2 - 1) * dw], 0);
     }
+}
+
+/// The window icon (icon.png of the repository, 48x48 RGBA).
+fn window_icon() -> Option<winit::window::Icon> {
+    let dec = png::Decoder::new(std::io::Cursor::new(&include_bytes!("../../icon.png")[..]));
+    let mut r = dec.read_info().ok()?;
+    let mut buf = vec![0; r.output_buffer_size()];
+    let info = r.next_frame(&mut buf).ok()?;
+    if info.color_type != png::ColorType::Rgba || info.bit_depth != png::BitDepth::Eight {
+        return None;
+    }
+    buf.truncate(info.buffer_size());
+    winit::window::Icon::from_rgba(buf, info.width, info.height).ok()
 }

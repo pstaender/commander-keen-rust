@@ -1434,7 +1434,7 @@ impl Game {
             out.extend_from_slice(&(self.ca_mapon as u16).to_le_bytes());
             out.extend_from_slice(&(len as u16).to_le_bytes());
             out.extend_from_slice(&self.demo.buffer[..len]);
-            if std::fs::write(self.data.dir.join(format!("DEMO{}.{}", n, super::LAYOUT.ext)), out).is_err() {
+            if std::fs::write(self.data.write_dir.join(format!("DEMO{}.{}", n, super::LAYOUT.ext)), out).is_err() {
                 self.quit("EndDemoRecord:  Cannot write demo file!");
             }
         }

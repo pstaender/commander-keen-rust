@@ -9,7 +9,9 @@ use std::path::PathBuf;
 
 const USAGE: &str = "keenN [options]
   --data DIR         directory with the original Keen 4, 5 or 6 files (the
-                     episode is detected from the files; default: KEENN)
+                     episode is detected from the files; default: KEENN in
+                     the current directory, next to the executable or in
+                     data/ next to it)
   --gfx-pack DIR     high resolution graphics replacement pack
   --audio-pack DIR   replacement sound effects (sfx/NN.ogg) and music (music/NN.ogg|.mid)
   --soundfont FILE   SoundFont (.sf2) for the MIDI music (CONFIGURE >
@@ -51,6 +53,7 @@ const USAGE: &str = "keenN [options]
 pub fn main(default_dir: &str) {
     let args: Vec<String> = std::env::args().collect();
     let mut data_dir = PathBuf::from(default_dir);
+    let mut data_given = false;
     let mut dump_dir: Option<PathBuf> = None;
     let mut midi_dir: Option<PathBuf> = None;
     let mut sfx_dir: Option<PathBuf> = None;
@@ -72,7 +75,10 @@ pub fn main(default_dir: &str) {
     };
     while i < args.len() {
         match args[i].as_str() {
-            "--data" => data_dir = PathBuf::from(next(&mut i)),
+            "--data" => {
+                data_dir = PathBuf::from(next(&mut i));
+                data_given = true;
+            }
             "--dump" => dump_dir = Some(PathBuf::from(next(&mut i))),
             "--gfx-pack" => gfx_pack = Some(PathBuf::from(next(&mut i))),
             "--audio-pack" => audio_pack = Some(PathBuf::from(next(&mut i))),
@@ -124,8 +130,40 @@ pub fn main(default_dir: &str) {
     // extended mode (EXTENDED OPTIONS in the main menu, F2/F3 quick save/load,
     // inventory box) is on unless --classic
     opts.cheatmode = !opts.classic;
+    if !data_given && !data_dir.is_dir() {
+        // started by double click (the working directory is not the game's):
+        // look next to the executable, also in data/ (the release archives:
+        // a KEEN4 directory beside the keen4 binary clashes on
+        // case-insensitive file systems)
+        if let Some(exe_dir) = std::env::current_exe().ok().and_then(|e| e.parent().map(|p| p.to_path_buf())) {
+            // (and in a macOS app bundle: Contents/Resources/data, or data/
+            // beside the .app)
+            let cands = [
+                exe_dir.join(default_dir),
+                exe_dir.join("data").join(default_dir),
+                exe_dir.join("../Resources/data").join(default_dir),
+                exe_dir.join("../../../data").join(default_dir),
+            ];
+            if let Some(d) = cands.into_iter().find(|d| d.is_dir()) {
+                data_dir = d;
+            }
+        }
+    }
     let data = match GameData::load_with_maps(&data_dir, maps_dir.as_deref()) {
-        Ok(d) => d,
+        Ok(mut d) => {
+            // inside a macOS app bundle the data is read-only (and may run
+            // from a randomized location): saves and config go to
+            // ~/Library/Application Support/Commander Keen/KEENn
+            if d.dir.to_string_lossy().contains(".app/Contents/") {
+                if let Some(home) = std::env::var_os("HOME") {
+                    let w = PathBuf::from(home).join("Library/Application Support/Commander Keen").join(default_dir);
+                    if std::fs::create_dir_all(&w).is_ok() {
+                        d.write_dir = w;
+                    }
+                }
+            }
+            d
+        }
         Err(e) => {
             eprintln!("error: {}", e);
             std::process::exit(1);

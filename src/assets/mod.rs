@@ -15,6 +15,9 @@ use std::path::{Path, PathBuf};
 
 pub struct GameData {
     pub dir: PathBuf,
+    /// where saves, config.txt, screenshots and recorded demos go: `dir`,
+    /// except for data inside a macOS app bundle (read-only)
+    pub write_dir: PathBuf,
     pub episode: Episode,
     pub layout: &'static Layout,
     pub exe: exe::ExeData,
@@ -79,7 +82,7 @@ impl GameData {
         let maps = maps::Maps::load(&gamemaps, &exe.maphead);
         let tileinfo = maps::TileInfo::from_maphead(lay, &exe.maphead);
         let audio = audio::Audio::load(lay, &audio, &exe.audiohed, &exe.audiodict);
-        Ok(GameData { dir: dir.to_path_buf(), episode: ep, layout: lay, exe, gfx, maps, tileinfo, audio })
+        Ok(GameData { dir: dir.to_path_buf(), write_dir: dir.to_path_buf(), episode: ep, layout: lay, exe, gfx, maps, tileinfo, audio })
     }
 }
 

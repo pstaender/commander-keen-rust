@@ -22,6 +22,14 @@ the executable (`KEEN4E.EXE`, `KEEN5E.EXE` or `KEEN6C.EXE`; `CONFIG.CKn` is
 optional). Keen 4 was shareware, Keen 5 and 6 were commercial releases, so
 use your own copy. The versions found on archive.org could work as well.
 
+The [release downloads](https://github.com/pstaender/commander-keen-rust/releases)
+(Linux, Windows, macOS) include the shareware episode Keen 4 in `data/KEEN4`
+(on macOS inside `Keen 4.app`), so Keen 4 is playable right away. For Keen 5
+and 6 put your files in `data/KEEN5` / `data/KEEN6` (or use `--data DIR`).
+On macOS the apps are not notarized: open them the first time with right
+click > Open. Saves of the bundled Keen 4 go to
+`~/Library/Application Support/Commander Keen/KEEN4`.
+
 ## Additonial features
 
 Play in widescreen mode:
@@ -50,7 +58,8 @@ ogg/wav/flac/mp3 decoding), `oplon` (OPL2/AdLib emulation), `rustysynth`
 
 ## Run
 
-Put the game files in a directory (default `KEEN4/`, `KEEN5/` or `KEEN6/`)
+Put the game files in a directory (default `KEEN4/`, `KEEN5/` or `KEEN6/`
+in the current directory, next to the executable or in `data/` next to it)
 and start the matching executable:
 
 ```sh
@@ -67,7 +76,7 @@ case-insensitively.
 
 | Option | Description |
 |---|---|
-| `--data DIR` | directory with the original game files (default `KEEN4`, `KEEN5` or `KEEN6`, after the executable's name) |
+| `--data DIR` | directory with the original game files (default `KEEN4`, `KEEN5` or `KEEN6`, after the executable's name; also looked up next to the executable and in `data/` there) |
 | `--gfx-pack DIR` | high-resolution graphics replacement pack (see below) |
 | `--audio-pack DIR` | replacement sound effects and music (see below) |
 | `--soundfont FILE` | SoundFont (`.sf2`) for the MIDI music and `.mid` replacement music (default: the first `.sf2` found, see below) |

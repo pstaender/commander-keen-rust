@@ -2565,7 +2565,7 @@ impl Game {
     // ---- saved games ----------------------------------------------------------
 
     fn save_path(&self, n: usize) -> PathBuf {
-        self.data.dir.join("saves").join(format!("SAVEGAM{}.{}", n, super::LAYOUT.ext))
+        self.data.write_dir.join("saves").join(format!("SAVEGAM{}.{}", n, super::LAYOUT.ext))
     }
 
     /// USL_CheckSavedGames (0x283b1): reads the names of the saved games.
@@ -2847,7 +2847,7 @@ impl Game {
 
     /// The gamepad save state (not one of the six saved games).
     fn state_path(&self) -> PathBuf {
-        self.data.dir.join("saves").join(format!("STATE.{}", super::LAYOUT.ext))
+        self.data.write_dir.join("saves").join(format!("STATE.{}", super::LAYOUT.ext))
     }
 
     /// Gamepad SAVE STATE (not in the original).
@@ -2874,7 +2874,7 @@ impl Game {
     // ---- autosave (not in the original) --------------------------------------
 
     fn autosave_path(&self) -> PathBuf {
-        self.data.dir.join("saves").join(format!("AUTOSAVE.{}", super::LAYOUT.ext))
+        self.data.write_dir.join("saves").join(format!("AUTOSAVE.{}", super::LAYOUT.ext))
     }
 
     /// Autosave is on unless --no-auto-save, not with --level (a test run
@@ -2992,7 +2992,7 @@ impl Game {
     // ---- config file ----------------------------------------------------------
 
     fn config_path(&self) -> PathBuf {
-        self.data.dir.join("config.txt")
+        self.data.write_dir.join("config.txt")
     }
 
     /// USL_ReadConfig (0x28145), as a text file `config.txt`.
@@ -3308,7 +3308,7 @@ impl Game {
     /// buffer, shuts down and waits for Esc before exiting to DOS, a way to
     /// grab screenshots; the port saves a PNG to `screenshots/` instead.
     fn debug_screenshot(&mut self) {
-        let dir = self.data.dir.join("screenshots");
+        let dir = self.data.write_dir.join("screenshots");
         let _ = std::fs::create_dir_all(&dir);
         let n = (0..10000).find(|n| !dir.join(format!("SHOT{:04}.png", n)).exists()).unwrap_or(0);
         let path = dir.join(format!("SHOT{:04}.png", n));

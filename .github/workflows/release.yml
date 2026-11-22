@@ -1,9 +1,11 @@
 # Builds keen4, keen5 and keen6 for Linux, Windows and macOS when a release
 # is published and attaches the archives to it.
 #
-# The original game files are NOT bundled: they are only downloaded (from
-# archive.org, cached for half a year) to run the tests and replay the
-# original demos with each build as a check.
+# The original game files are downloaded from archive.org (cached for half
+# a year) to run the tests and replay the original demos with each build.
+# Only Keen 4 (the shareware episode) is bundled (data/KEEN4 next to the
+# binaries, inside "Keen 4.app" on macOS), so keen4 is playable right away; Keen 5 and 6 (commercial) are
+# never bundled or uploaded as artifacts.
 name: Release builds
 
 on:
@@ -19,20 +21,24 @@ env:
 
 jobs:
   game-data:
-    name: Original game data (checks only)
+    name: Original game data
     runs-on: ubuntu-latest
+    outputs:
+      key: ${{ steps.key.outputs.key }}
     steps:
       # one cache key per half year, so archive.org is asked at most twice a year
       - name: Cache key
         id: key
-        run: echo "half=$(date -u +%Y)-h$(( ($(date -u +%-m) + 5) / 6 ))" >> "$GITHUB_OUTPUT"
+        run: echo "key=keen-data-$(date -u +%Y)-h$(( ($(date -u +%-m) + 5) / 6 ))" >> "$GITHUB_OUTPUT"
 
-      - name: Cache the original zip files
+      # the build jobs restore this cache on every OS (no artifact)
+      - name: Cache the original game files
         id: cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
-          path: zips
-          key: keen-zips-${{ steps.key.outputs.half }}
+          path: gamedata
+          key: ${{ steps.key.outputs.key }}
+          enableCrossOsArchive: true
 
       - name: Download from archive.org
         if: steps.cache.outputs.cache-hit != 'true'
@@ -44,22 +50,17 @@ jobs:
           dl https://archive.org/download/keen-6/Keen6.zip keen6.zip
 
       - name: Unpack into KEEN4, KEEN5, KEEN6
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           for n in 4 5 6; do
             tmp=$(mktemp -d)
             unzip -q "zips/keen$n.zip" -d "$tmp"
             # the zips differ in layout: take the directory holding EGAGRAPH.CKn
             src=$(dirname "$(find "$tmp" -iname "EGAGRAPH.CK$n" | head -n1)")
-            mkdir -p "data/KEEN$n"
-            cp "$src"/* "data/KEEN$n/"
-            ls -l "data/KEEN$n"
+            mkdir -p "gamedata/KEEN$n"
+            cp "$src"/* "gamedata/KEEN$n/"
+            ls -l "gamedata/KEEN$n"
           done
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: game-data
-          path: data
-          retention-days: 1
 
   build:
     name: ${{ matrix.name }}
@@ -82,7 +83,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Linux build dependencies
         if: runner.os == 'Linux'
@@ -98,10 +99,15 @@ jobs:
         with:
           key: ${{ matrix.name }}
 
-      - uses: actions/download-artifact@v4
+      - name: Restore the original game files
+        uses: actions/cache/restore@v6
         with:
-          name: game-data
-          path: .
+          path: gamedata
+          key: ${{ needs.game-data.outputs.key }}
+          enableCrossOsArchive: true
+          fail-on-cache-miss: true
+
+      - run: cp -r gamedata/KEEN4 gamedata/KEEN5 gamedata/KEEN6 .
 
       - name: Build
         run: |
@@ -138,8 +144,26 @@ jobs:
           tag="${{ github.event.release.tag_name || github.ref_name }}"
           name="commander-keen-rust-$tag-${{ matrix.name }}"
           mkdir "$name"
-          for e in 4 5 6; do cp "target/release/keen$e${{ matrix.exe }}" "$name/"; done
           cp README.md "$name/"
+          # Keen 4 is shareware: bundle it so keen4 runs right away. Keen 5
+          # and 6 data go to data/KEEN5, data/KEEN6 (data/, since a KEEN4
+          # directory would clash with the keen4 binary on case-insensitive
+          # file systems)
+          mkdir -p "$name/data/KEEN4" "$name/data/KEEN5" "$name/data/KEEN6"
+          cp KEEN4/AUDIO.CK4 KEEN4/EGAGRAPH.CK4 KEEN4/GAMEMAPS.CK4 KEEN4/KEEN4*.EXE "$name/data/KEEN4/"
+          if [ "$RUNNER_OS" = macOS ]; then
+            # app bundles with the icon; Keen 4's data inside its bundle
+            python3 -I tools/make_icns.py icon.png keen.icns
+            tools/make_app.sh "Keen 4" target/release/keen4 keen.icns "$name" "$name/data/KEEN4"
+            tools/make_app.sh "Keen 5" target/release/keen5 keen.icns "$name"
+            tools/make_app.sh "Keen 6" target/release/keen6 keen.icns "$name"
+            rm -r "$name/data/KEEN4"
+            echo "bin=$name/Keen 4.app/Contents/MacOS/keen4" >> "$GITHUB_OUTPUT"
+          else
+            for e in 4 5 6; do cp "target/release/keen$e${{ matrix.exe }}" "$name/"; done
+            echo "bin=$name/keen4${{ matrix.exe }}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Put the original files of Keen 5 / Keen 6 into KEEN5 / KEEN6." > "$name/data/README.txt"
           if [ "$RUNNER_OS" = Windows ]; then
             7z a -tzip "$name.zip" "$name" > /dev/null
             echo "file=$name.zip" >> "$GITHUB_OUTPUT"
@@ -148,7 +172,12 @@ jobs:
             echo "file=$name.tar.gz" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - name: Check that the packaged keen4 starts without --data
+        run: |
+          exe="$PWD/${{ steps.pkg.outputs.bin }}"
+          cd "$RUNNER_TEMP" && "$exe" --headless --nosound --demo 0
+
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.name }}
           path: ${{ steps.pkg.outputs.file }}
