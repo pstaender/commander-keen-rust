@@ -101,6 +101,9 @@ runtime and are never committed.
   vertical scroll blocks/centering follow the wide rules, `fall_line()`
   keeps the original death line. `MARKER_TILES` (rf.rs: BLOCK, EDGE /
   BOTTOM OF MAP foreground tiles) are drawn black in wide/zoomed views.
+  The room around the player (masking, centering) uses `room_pos()`,
+  kept inside the map's edge blocks; "on the world map" checks for
+  drawing use `ca_mapon` (gamestate.mapon changes a frame early).
   The help menu's
   hand can point at the HELP! title: `NEW_HELP` in text.rs, the pages about
   this version (keep it current when adding features).

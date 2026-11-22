@@ -610,7 +610,7 @@ impl Game {
     /// games, demos and the map logic don't know him.
     pub fn mp_world_tick(&mut self) {
         self.mp_auto_enable();
-        if self.gs.mapon != 0 || !self.mp_available() {
+        if self.ca_mapon != 0 || !self.mp_available() {
             self.rf.extra.clear();
             return;
         }
@@ -761,7 +761,7 @@ impl Game {
     /// isn't in this level (on the world map he is shown in two player
     /// mode).
     pub fn mp_p2_status(&self) -> Option<(i32, i32)> {
-        let world = self.gs.mapon == 0 && self.mp_available();
+        let world = self.ca_mapon == 0 && self.mp_available();
         if !self.mp_in_level() && !self.mp.out && !world {
             return None;
         }
@@ -1101,6 +1101,50 @@ mod tests {
         assert_eq!(g.player, p1);
         assert_eq!(g.gs.score, 100);
         assert!(g.obj_free[p2]);
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// The last frame of a level (faded out) while Keen walks out past the
+    /// map's edge still shows the level, not the strip beyond the edge;
+    /// Keen 5's world map keeps its black (not yellow) border while a
+    /// level is being entered (gamestate.mapon already set).
+    #[test]
+    fn last_frames_before_fading_out() {
+        let tmp = std::env::temp_dir().join(format!("keen-fade-{}-{}", super::super::EPISODE, std::process::id()));
+        let _ = std::fs::create_dir_all(&tmp);
+        let Some(mut g) = two_player_game(&tmp) else { return };
+        g.mp.enabled = false;
+        g.mp_tick();
+        g.wide_ok = true;
+        g.opts.zoom = 50;
+        g.update_view();
+        let p = g.player;
+        // at the left edge of the map, in a room narrower than the view
+        // (like Keen 6's Megarocket level), so the view reaches beyond
+        // the edge
+        g.objs[p].x = 0x280;
+        g.cam.vblocks.push(20);
+        g.center_actor(p);
+        let lit = |g: &Game| g.sys.surface.px.iter().filter(|&&c| c & 0xffffff != 0).count();
+        g.draw_playfield();
+        let before = lit(&g);
+        // walked out of the left edge (left of the scroll block in column 1)
+        g.objs[p].x = 0x80;
+        g.draw_playfield();
+        assert!(lit(&g) * 2 > before, "the level stays visible");
+        if super::super::EPISODE == 5 {
+            g.gs.mapon = 0;
+            assert!(g.setup_game_level(false));
+            g.update_view();
+            let p = g.player;
+            g.center_actor(p);
+            g.draw_playfield();
+            let yellow = |g: &Game| g.sys.surface.px.iter().filter(|&&c| c & 0xffffff == 0xffff55).count();
+            let y0 = yellow(&g);
+            g.gs.mapon = 1;
+            g.draw_playfield();
+            assert_eq!(yellow(&g), y0);
+        }
         let _ = std::fs::remove_dir_all(&tmp);
     }
 

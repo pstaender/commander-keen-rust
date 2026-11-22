@@ -236,7 +236,7 @@ impl Game {
                     break;
                 }
             }
-            if let Some(cx) = c.narrow_room_x(self.objs[self.player].x, self.mapwidth) {
+            if let Some(cx) = c.narrow_room_x(self.room_pos().0, self.mapwidth) {
                 x = cx;
             }
         } else {
@@ -265,7 +265,7 @@ impl Game {
                     break;
                 }
             }
-            if let Some(cy) = c.narrow_room_y(self.objs[self.player].y, self.mapheight) {
+            if let Some(cy) = c.narrow_room_y(self.room_pos().1, self.mapheight) {
                 y = cy;
             }
         } else {
@@ -338,12 +338,12 @@ impl Game {
             }
         }
         if self.cam.wide() {
-            if let Some(cx) = self.cam.narrow_room_x(self.objs[self.player].x, self.mapwidth) {
+            if let Some(cx) = self.cam.narrow_room_x(self.room_pos().0, self.mapwidth) {
                 x = cx;
             }
         }
         if self.cam.tall() {
-            if let Some(cy) = self.cam.narrow_room_y(self.objs[self.player].y, self.mapheight) {
+            if let Some(cy) = self.cam.narrow_room_y(self.room_pos().1, self.mapheight) {
                 y = cy;
             }
         }
@@ -473,11 +473,20 @@ impl Game {
         self.cam.view_rows() + PORTTILESHIGH - 13 + 1
     }
 
+    /// The player's position for finding the room he is in, kept inside
+    /// the scroll blocks at the map's edges: walking out of a level, the
+    /// last frame (faded out) would otherwise show the strip beyond the
+    /// edge (Keen 6's EXIT marker tiles) and black out the level.
+    fn room_pos(&self) -> (i32, i32) {
+        let p = &self.objs[self.player];
+        let clampg = |v: i32, n: i32| if n > 4 { v.clamp(2 * 256, (n - 2) * 256 - 1) } else { v };
+        (clampg(p.x, self.mapwidth), clampg(p.y, self.mapheight))
+    }
+
     /// Widescreen: blacks out what lies beyond the scroll blocks around the
     /// player when a room is narrower than the view.
     fn mask_scroll_blocks(&mut self) {
-        let p = &self.objs[self.player];
-        let (px, py) = (p.x, p.y);
+        let (px, py) = self.room_pos();
         let (ox, oy) = (self.cam.originxglobal, self.cam.originyglobal);
         let (vw, vh) = (self.cam.view_w(), self.cam.view_hpx());
         for &b in &self.cam.vblocks {
@@ -759,8 +768,10 @@ impl Game {
                 }
                 let b = self.map_tile(0, mx, my);
                 // Keen 5's world map fills what the original view never
-                // shows with a yellow tile: black, for the wide view
-                if super::EPISODE == 5 && b == 850 && self.gs.mapon == 0 {
+                // shows with a yellow tile: black, for the wide view (the
+                // map shown: entering a level sets gamestate.mapon during
+                // the world map's last frame)
+                if super::EPISODE == 5 && b == 850 && self.ca_mapon == 0 {
                     self.sys.surface.bar(px, py, 16, 16, 0);
                 } else if let Some(Some(t)) = self.gfx.tile16.get(b) {
                     self.sys.surface.blit_phys(t, px * scale, py * scale);

@@ -106,7 +106,7 @@ impl Game {
     /// map only what is used there (Keen 6's special items): gems and
     /// keycard only open doors in levels.
     fn draw_items_box(&mut self) {
-        let level = self.gs.mapon != 0;
+        let level = self.ca_mapon != 0;
         // (icon, collected, the episode's own "not collected" icon)
         let mut items: Vec<(i32, bool, Option<i32>)> = Vec::new();
         if level {
