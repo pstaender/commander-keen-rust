@@ -156,7 +156,12 @@ impl Game {
     /// Keen was killed: dying, dead or (Keen 4) eaten by the dopefish. Not
     /// in the original (the autosave skips these moments).
     pub fn keen_dying(&self) -> bool {
-        let s = self.objs[self.player].state;
+        self.keen_obj_dying(self.player)
+    }
+
+    /// keen_dying for any Keen object (two player mode).
+    pub fn keen_obj_dying(&self, ob: usize) -> bool {
+        let s = self.objs[ob].state;
         #[allow(unused_mut)]
         let mut d = same(s, &S_KEENDIE1) || same(s, &S_KEENDIE2) || same(s, &S_KEENDEAD);
         ep4! {
@@ -603,12 +608,12 @@ pub fn keen_enter_think(g: &mut Game, ob: usize) {
     let next = g.objs[ob].st().next.unwrap_or(&S_KEENSTAND);
     g.change_state(ob, next);
     g.objs[ob].needtoclip = CL_MIDCLIP;
-    // two player mode: the camera stays with player 1, and player 2 comes
-    // along through player 1's doors
+    // two player mode: the other Keen comes along through the door (the
+    // camera follows the first Keen)
     if !g.mp.swapped {
         g.center_actor(ob);
-        g.mp_follow_door();
     }
+    g.mp_follow_door();
 }
 
 /// KeenSwitchThink (0x1aaf2)

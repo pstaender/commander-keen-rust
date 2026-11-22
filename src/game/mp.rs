@@ -98,6 +98,8 @@ pub struct MpState {
     /// the camera follows him) is played by player 2, the second Keen by
     /// player 1 (until the level ends)
     pub flipped: bool,
+    /// the second Keen went through a door: he takes the lead
+    pub door_lead: bool,
 }
 
 impl Game {
@@ -191,8 +193,9 @@ impl Game {
         }
     }
 
-    /// Player 1 died (or fell out of the map with `force`) while player 2
-    /// is alive: player 2 takes the lead. The two Keen objects exchange
+    /// Player 1 died (or, with `force`: fell out of the map, or player 2
+    /// went through a door) while player 2 is alive: player 2 takes the
+    /// lead. The two Keen objects exchange
     /// everything but their place in the object list (the first one stays
     /// `player`, which the original code relies on), the per player
     /// globals, dizziness and the owners of the flying shots. True if done.
@@ -337,6 +340,7 @@ impl Game {
     /// Keen 4's underwater level).
     pub fn mp_setup_level(&mut self) {
         self.mp_auto_enable();
+        self.mp.door_lead = false;
         self.mp_unflip();
         self.mp.p2 = None;
         self.mp.respawn = 0;
@@ -448,18 +452,27 @@ impl Game {
         self.mp.away = 0;
     }
 
-    /// Player 1 went through a door: player 2 comes along.
+    /// A Keen went through a door (KeenEnterThink): the other one comes
+    /// along. The one who went through leads (the camera follows him): for
+    /// the second Keen the lead changes at the end of the frame
+    /// (`mp_tick`, outside `as_p2`).
     pub fn mp_follow_door(&mut self) {
-        if let (false, Some(p2)) = (self.mp.swapped, self.mp.p2) {
+        if self.mp.swapped {
+            self.mp.door_lead = true;
+            return;
+        }
+        if let Some(p2) = self.mp.p2 {
             if !self.mp_p2_dying(p2) {
                 self.mp_warp_p2(p2);
             }
         }
     }
 
+    /// The Keen object `p2` (either one) is dying. (Only by his state: a
+    /// Keen on a pole or climbing onto a ledge has no clipping either, and
+    /// must still come along through doors and be brought back.)
     fn mp_p2_dying(&self, p2: usize) -> bool {
-        let s = self.objs[p2].state;
-        same(s, &S_KEENDIE1) || same(s, &S_KEENDIE2) || same(s, &S_KEENDEAD) || self.objs[p2].needtoclip == CL_NOCLIP
+        self.keen_obj_dying(p2)
     }
 
     /// From the play loop, after the reactions: player 2's reaction (or
@@ -485,6 +498,14 @@ impl Game {
         // player 1 dies: player 2 goes on
         if self.mp.p2.is_some() && !self.mp.swapped && self.keen_dying() {
             self.mp_handover(false);
+        }
+        // the second Keen went through a door: he leads, the other follows
+        if std::mem::take(&mut self.mp.door_lead) && !self.keen_dying() && self.mp_handover(true) {
+            if let Some(p2) = self.mp.p2 {
+                self.mp_warp_p2(p2);
+            }
+            let p = self.player;
+            self.center_actor(p);
         }
         if !self.mp_in_level() {
             return;
@@ -928,6 +949,41 @@ mod tests {
         g.sys.input.two_pads_at_start = true;
         g.mp_auto_enable();
         assert!(g.mp.enabled && !g.sys.input.two_pads_at_start);
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn doors_bring_the_other_keen_along() {
+        let tmp = std::env::temp_dir().join(format!("keen-mp-door-{}-{}", super::super::EPISODE, std::process::id()));
+        let _ = std::fs::create_dir_all(&tmp);
+        let Some(mut g) = two_player_game(&tmp) else { return };
+        let (p1, p2) = (g.player, g.mp.p2.unwrap());
+        // player 2 went through a door: he leads now (the first Keen, the
+        // camera follows him), player 1 comes along
+        let (x, y) = (g.objs[p1].x + 0x300, g.objs[p1].y);
+        g.as_p2(|g| {
+            g.objs[p2].x = x;
+            g.objs[p2].y = y;
+            g.mp_follow_door();
+        });
+        g.mp_tick();
+        assert!(g.mp.flipped);
+        assert_eq!((g.player, g.mp.p2), (p1, Some(p2)));
+        // (the fall shape may shift him a little, by his facing)
+        assert_eq!(g.objs[p1].x, x);
+        assert!((g.objs[p2].x - x).abs() < 0x100);
+        assert!(same(g.objs[p2].state, &S_KEENFALL1));
+        // the leader (player 2) went through one: player 1 follows, also
+        // from a pole (no clipping there, but not dying)
+        g.as_p2(|g| {
+            g.objs[p2].needtoclip = CL_NOCLIP;
+            g.change_state(p2, &S_KEENPOLE);
+        });
+        g.objs[p1].x = x + 0x100;
+        g.mp_follow_door();
+        assert!((g.objs[p2].x - (x + 0x100)).abs() < 0x100);
+        assert!(same(g.objs[p2].state, &S_KEENFALL1));
+        assert!(g.mp.flipped);
         let _ = std::fs::remove_dir_all(&tmp);
     }
 }
