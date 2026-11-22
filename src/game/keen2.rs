@@ -101,7 +101,7 @@ impl Game {
 
     /// The inventory: the items for getting through the level (gems;
     /// Keen 5 the keycard, Keen 6 the sandwich, rope and passcard; shared
-    /// in two player mode), at the bottom right of the play field, framed
+    /// in multiplayer mode), at the bottom right of the play field, framed
     /// like the score box. The icons of the status window; an item not
     /// collected yet is shown unlit (Keen 6's own dark icons, otherwise the
     /// icon's shape in dark gray). On the world
@@ -571,8 +571,8 @@ impl Game {
         if ep_sel!(true, true, false) {
             return;
         }
-        // hit something right away? (two player mode: player 2 shooting
-        // checks the objects before him too, but not himself)
+        // hit something right away? (multiplayer mode: another Keen
+        // shooting checks the objects before him too, but not himself)
         let mut i = self.objs[self.mp_first_obj()].next;
         while let Some(h) = i {
             if h == self.player {

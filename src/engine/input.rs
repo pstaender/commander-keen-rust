@@ -443,8 +443,9 @@ pub struct Input {
     pub pad_connected: bool,
     /// number of connected gamepads
     pub pad_count: usize,
-    /// two gamepads were found at launch (in the first seconds): two player
-    /// mode is switched on (consumed by the game, `Game::mp_auto_enable`)
+    /// two gamepads were found at launch (in the first seconds):
+    /// multiplayer mode is switched on with 2 players (consumed by the game,
+    /// `Game::mp_auto_enable`)
     pub two_pads_at_start: bool,
     /// multiplayer (not in the original): the number of players the
     /// controls are split between (0 or 1: not split, all gamepads and the

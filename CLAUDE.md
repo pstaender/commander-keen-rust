@@ -148,6 +148,11 @@ runtime and are never committed.
   OPTIONS card in place of END GAME, which moves into that card, F2/F3,
   inventory box).
   New non-original features should respect it.
+- In-game help: every new or changed feature also goes into the help
+  pages about this version (`NEW_HELP` in src/game/text.rs, F1 in Keen 4/5,
+  hand on the HELP! title), together with README.md. Check the pages for
+  outdated information when features change, and that each page still
+  fits on the screen (headless screenshots of the help).
 - Original globals live in `Game` (src/game/mod.rs); module-private globals
   go in the module's `ModState`.
 - Don't commit game data or anything derived from the executable's code.

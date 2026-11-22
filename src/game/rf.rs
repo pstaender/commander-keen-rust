@@ -125,10 +125,10 @@ pub struct SpriteSlot {
     /// multiplayer: drawn in the colors of this player (0 = player 1's,
     /// Keen's own; 1-3 = players 2-4; not in the original)
     pub alt: u8,
-    /// two player mode: a dizzy Keen, drawn sitting (`Gfx::stunned`)
+    /// multiplayer mode: a dizzy Keen, drawn sitting (`Gfx::stunned`)
     pub stunned: bool,
-    /// two player mode: the Keen who doesn't lead (the view follows the
-    /// other one): his place behind him (0: the leading Keen, 1-3: the
+    /// multiplayer mode: for the Keens that don't lead (the view follows
+    /// the leading one): the place behind him (0: the leading Keen, 1-3: the
     /// others, further back the higher), whatever his colors
     pub depth: u8,
 }
@@ -167,8 +167,8 @@ pub struct RfState {
     pub fg_group: Vec<i32>,
     pub sprites: Vec<SpriteSlot>,
     pub stars: Vec<SpriteSlot>,
-    /// sprites without an object (two player mode: Keen 2 on the world
-    /// map; not in the original)
+    /// sprites without an object (multiplayer mode: the other Keens on the
+    /// world map; not in the original)
     pub extra: Vec<SpriteSlot>,
     /// counter for new sprite places (see `SpriteSlot::order`)
     pub order: i64,
@@ -794,9 +794,8 @@ impl Game {
         // sprites by priority, masked foreground tiles before priority 3
         let mut list: Vec<SpriteSlot> =
             self.rf.sprites.iter().chain(self.rf.stars.iter()).chain(self.rf.extra.iter()).filter(|s| s.visible).copied().collect();
-        // (two player mode: the Keen who doesn't lead first, i.e. behind
-        // the one the view follows)
-        // (the furthest back first)
+        // (multiplayer mode: the Keens that don't lead first, the furthest
+        // back first, i.e. behind the one the view follows)
         list.sort_by_key(|s| (s.priority, if s.depth > 0 { i64::MIN + 8 - s.depth as i64 } else { s.order }));
         let mut i = 0;
         for pr in 0..PRIORITIES {

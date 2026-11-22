@@ -73,7 +73,7 @@ Press F11 (or Cmd+F on a Mac, Win+F on Windows) to switch between a window and f
 ^P
 {D}{H}ZOOM
 {B}
-Want to see even more? Press the minus key while you play to zoom out to 75 or 50 percent, and the plus key to zoom back in. Everything gets smaller, but you can see much more of the level above, below and around Keen. That is handy with more players.
+Want to see even more? Press the minus key while you play to zoom out to 75 or 50 percent, and the plus key to zoom back in. Everything gets smaller, but you can see much more of the level above, below and around Keen. That is handy in multiplayer mode.
 
 You can also change Zoom under Extended Options. Keen remembers your choice.
 ^P
@@ -89,23 +89,36 @@ In the ComputerWrist the gamepad moves the hand, the jump button chooses an item
 
 No calibration is needed.  Even cheap gamepads that the computer doesn't know work fine.
 ^P
-{D}{H}MORE PLAYERS
+{D}{H}MULTIPLAYER
 {B}
-Bring your friends! Choose up to four Players under Extended Options or Configure, Use Gamepad (two players are chosen by themselves when two gamepads are plugged in at the start). Every player needs a gamepad, except the last one, who may use the keyboard.
+Bring your friends: up to four players can play at once! Choose the number of Players under Extended Options or Configure, Use Gamepad (two players are chosen by themselves when two gamepads are plugged in at the start). Every player needs a gamepad, except the last one, who may use the keyboard.
 
-Player 2 wears a blue helmet and a green shirt, player 3 a cyan shirt and player 4 a red one. On the world map they tag along behind player 1.
+Player 2 wears a blue helmet and a green shirt, player 3 a red helmet and a cyan shirt, player 4 a green helmet and a red shirt. Each player has his own score box.
 ^P
-{D}{H}MORE PLAYERS (cont'd.)
+{D}{H}MULTIPLAYER (cont'd.)
 {B}
-The view follows player 1. A Keen lost off the screen is brought back. Keys, gems and lives are shared (you start with three lives for each player), shots you find go to everybody, but each Keen keeps his own score.
+The view follows the leading Keen. A Keen lost off the screen is brought back. On the world map only the leading player walks, and the others tag along behind him.
+
+Keys, gems and lives are shared (you start with three lives for each player), shots you find go to everybody, but each Keen keeps his own score.
+^P
+{D}{H}MULTIPLAYER (cont'd.)
+{B}
 
 Careful where you aim: a stunner shot makes another Keen dizzy for two seconds. He falls off his pogo stick, sits down and sees stars.
 
 When the leading Keen dies, the next one plays on, and the view follows him. The fallen Keen comes back for one of the lives. If there are none left, he waits for the next level.
 ^P
+{D}{H}EXTENDED OPTIONS
+{B}
+The main menu of the ComputerWrist has Extended Options. There you can add lives and shots, play with unlimited lives or shots, enter finished levels again, show the inventory, zoom out and choose the number of players. End Game is there, too. Keen remembers your choices.
+
+The inventory at the bottom right shows the gems and other items you are carrying.
+^P
 {D}{H}QUICK SAVE
 {B}
 Is that last jump giving you trouble? Press the gamepad's Save State button to save the game right where you are, and Load State brings you back there. You can also load the quick save from Load Game: press the down arrow key past the last game, and you will find it on the second page.
+
+F2 saves the game in the slot you used last, and F3 loads it again, without any questions.
 ^P
 {D}{H}AUTOSAVE
 {B}
@@ -130,6 +143,7 @@ Here are some new command line parameters:
 {D}{H}COMMAND LINE PARAMETERS (cont'd.)
 {B}
   {K} --no-auto-save  (Don't save the game every five seconds.)
+  {K} --zoom 50  (Zoom out to 50 percent.)
   {K} --level 3  (Jump right into level 3.)
   {K} --difficulty hard  (Use with --level: easy, normal or hard.)
   {K} --maps DIR  (Play the levels you made with the Commander Keen Editor.)

@@ -99,7 +99,7 @@ pub struct Game {
     pub lastlevel: i32,
     pub restartdifficulty: i32,
     pub demo: demo::DemoState,
-    /// two player mode (not in the original)
+    /// multiplayer mode, up to 4 players (not in the original)
     pub mp: mp::MpState,
 
     // per-module state of the ported CK6 modules

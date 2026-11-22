@@ -222,7 +222,7 @@ impl Game {
 
     /// The rest of PollControls with the control state read.
     fn apply_controls(&mut self, c: ControlInfo, fire: bool) {
-        // two player mode: a dizzy Keen can't do anything
+        // multiplayer mode: a dizzy Keen can't do anything
         let (c, fire) = if self.mp_dizzy() { (ControlInfo::default(), false) } else { (c, fire) };
         self.c = c;
         if self.c.yaxis != -1 {
@@ -930,7 +930,7 @@ impl Game {
                             && (a.top as u16) < (b.bottom as u16)
                             && (b.top as u16) < (a.bottom as u16)
                         {
-                            // (as player 2 if it is about him)
+                            // (as another Keen if it is about him)
                             if let Some(c) = self.objs[ob].state.and_then(|s| s.contact) {
                                 self.mp_contact(c, ob, h);
                             }
@@ -973,7 +973,7 @@ impl Game {
                             }
                         }
                     } else if self.objs[ob].obclass == KEENOBJ {
-                        // (two player mode: player 2 may go on)
+                        // (multiplayer mode: another Keen may go on)
                         if !(ob == self.player && self.mp_leader_fell()) {
                             self.playstate = EX_DIED;
                         }

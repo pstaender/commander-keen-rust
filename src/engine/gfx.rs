@@ -24,7 +24,7 @@ pub struct Gfx {
     /// multiplayer: the sprites in the colors of players 2, 3 and 4, made
     /// when first drawn (`alt_sprite`)
     pub sprites_alt: [Vec<Option<Tex>>; 3],
-    /// two player mode: Keen 6's sitting, dazed Keen (also borrowed by
+    /// multiplayer mode: Keen 6's sitting, dazed Keen (also borrowed by
     /// Keen 4 and 5 from the Keen 6 files); None until first needed,
     /// Some(None) if not available
     pub stunned: Option<Option<StunSprite>>,

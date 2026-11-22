@@ -110,8 +110,8 @@ const JERKCARD: usize = 18;
 const CHEATCARD: usize = 19;
 /// the END GAME entry of the extended options card
 const CHEAT_ENDGAME_ITEM: usize = 8;
-/// the TWO PLAYERS entry of the extended options card (needs a gamepad)
-const CHEAT_TWOPLAYERS_ITEM: usize = 7;
+/// the PLAYERS entry of the extended options card (needs a gamepad)
+const CHEAT_PLAYERS_ITEM: usize = 7;
 /// a gamepad is connected: "USE GAMEPAD" (replaces the joystick entries
 /// of the config card) and its movement / button binding cards
 const PADCARD: usize = 20;
@@ -122,8 +122,8 @@ const SOUND_VOLUME_ITEM: usize = 4;
 const MUSIC_VOLUME_ITEM: usize = 3;
 /// the MIDI MUSIC entry of MUSICCARD
 const MUSIC_MIDI_ITEM: usize = 2;
-/// the TWO PLAYERS entry of PADCARD
-const PAD_TWOPLAYERS_ITEM: usize = 3;
+/// the PLAYERS entry of PADCARD
+const PAD_PLAYERS_ITEM: usize = 3;
 /// the gamepad actions of the PADMOVECARD and PADBUTTONSCARD entries
 const PADMOVE_ACTIONS: [usize; 4] = [PAD_UP, PAD_DOWN, PAD_LEFT, PAD_RIGHT];
 const PADBUTTON_ACTIONS: [usize; 6] = [PAD_JUMP, PAD_POGO, PAD_FIRE, PAD_MENU, PAD_SAVESTATE, PAD_LOADSTATE];
@@ -688,8 +688,8 @@ struct LoadedGame {
     objectcount: i32,
     player: usize,
     scoreobj: usize,
-    /// two player mode (not in older saves): player 2's object, score,
-    /// next extra life, shots, out of lives
+    /// multiplayer mode (not in older saves): the other Keens' objects,
+    /// scores, next extra lives, shots, out of lives; who plays which
     mp: Option<MpSave>,
 }
 
@@ -703,8 +703,8 @@ struct MpSave {
     person: [usize; 4],
 }
 
-/// marks the two player part at the end of a saved game
-/// two player saves of 0.3.4 and older
+/// marks the two player part at the end of a saved game (saves of 0.3.4
+/// and older)
 const MPMAGIC: &[u8; 4] = b"MP2\0";
 /// multiplayer saves (up to 4 players)
 const MPMAGIC4: &[u8; 4] = b"MP4\0";
@@ -1148,7 +1148,7 @@ impl Game {
             fire.flags |= UI_DISABLED;
         }
         let n = self.mp.players.clamp(1, 4);
-        if let Some(it) = self.menu.cards[PADCARD].items.get_mut(PAD_TWOPLAYERS_ITEM) {
+        if let Some(it) = self.menu.cards[PADCARD].items.get_mut(PAD_PLAYERS_ITEM) {
             it.text = ["PLAYERS (1)", "PLAYERS (2)", "PLAYERS (3)", "PLAYERS (4)"][n - 1];
         }
     }
@@ -1338,7 +1338,7 @@ impl Game {
             }
             // multiplayer mode (in a level at once when the game goes on,
             // `mp_apply_mode`)
-            UIC_HIT if i == Some(PAD_TWOPLAYERS_ITEM) => {
+            UIC_HIT if i == Some(PAD_PLAYERS_ITEM) => {
                 self.mp_next_players();
                 self.usl_set_options_text();
                 let n = self.mp.players;
@@ -1549,7 +1549,7 @@ impl Game {
                     }
                 }
                 // multiplayer mode needs a gamepad (player 1's)
-                let it = &mut self.menu.cards[CHEATCARD].items[CHEAT_TWOPLAYERS_ITEM];
+                let it = &mut self.menu.cards[CHEATCARD].items[CHEAT_PLAYERS_ITEM];
                 if self.sys.input.pad_connected {
                     it.flags &= !UI_DISABLED;
                 } else {
@@ -2266,7 +2266,7 @@ impl Game {
                 self.menu.cards[PADBUTTONSCARD].items.truncate(4);
                 self.menu.cards[SOUNDCARD].items.truncate(SOUND_VOLUME_ITEM);
                 self.menu.cards[MUSICCARD].items.truncate(MUSIC_MIDI_ITEM);
-                self.menu.cards[PADCARD].items.truncate(PAD_TWOPLAYERS_ITEM);
+                self.menu.cards[PADCARD].items.truncate(PAD_PLAYERS_ITEM);
             }
         }
         self.usl_check_saved_games();

@@ -159,7 +159,7 @@ impl Game {
         self.keen_obj_dying(self.player)
     }
 
-    /// keen_dying for any Keen object (two player mode).
+    /// keen_dying for any Keen object (multiplayer mode).
     pub fn keen_obj_dying(&self, ob: usize) -> bool {
         let s = self.objs[ob].state;
         #[allow(unused_mut)]
@@ -178,7 +178,7 @@ impl Game {
         }
         self.set_moonok(0);
         self.invincible = 30;
-        // (two player mode: the camera stays with player 1)
+        // (multiplayer mode: the camera stays with the leading Keen)
         if self.mp.cur == 0 {
             self.scrolllock = true;
         }
@@ -608,7 +608,7 @@ pub fn keen_enter_think(g: &mut Game, ob: usize) {
     let next = g.objs[ob].st().next.unwrap_or(&S_KEENSTAND);
     g.change_state(ob, next);
     g.objs[ob].needtoclip = CL_MIDCLIP;
-    // two player mode: the other Keen comes along through the door (the
+    // multiplayer mode: the other Keens come along through the door (the
     // camera follows the first Keen)
     if g.mp.cur == 0 {
         g.center_actor(ob);
@@ -1057,7 +1057,7 @@ pub fn keen_die_think(g: &mut Game, ob: usize) {
 
 /// KeenContact: what touching an object does, per episode (src/ckN/ep.rs).
 pub fn keen_contact(g: &mut Game, ob: usize, hit: usize) {
-    // two player mode: the other player's stunner shots
+    // multiplayer mode: the other players' stunner shots
     if g.mp_shot_hits_keen(ob, hit) {
         return;
     }
