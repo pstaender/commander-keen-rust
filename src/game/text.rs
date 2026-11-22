@@ -91,7 +91,9 @@ The view follows player 1. If player 2 is lost off the screen, he is brought bac
 ^P
 {D}{H}TWO PLAYERS (cont'd.)
 {B}
-Careful where you aim: a stunner shot makes the other Keen dizzy for two seconds. He sits down and sees stars. When player 2 dies, he comes back next to player 1 for one of the lives. If there are none left, he waits for the next level.
+Careful where you aim: a stunner shot makes the other Keen dizzy for two seconds. He falls off his pogo stick, sits down and sees stars.
+
+When a Keen dies, the other one plays on, and the view follows him. The fallen Keen comes back next to him for one of the lives. If there are none left, he waits for the next level.
 ^P
 {D}{H}QUICK SAVE
 {B}

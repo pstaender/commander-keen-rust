@@ -76,10 +76,18 @@ impl Game {
         if !self.showscorebox {
             return;
         }
-        let (score, ammo) = (self.gs.score, self.gs.ammo);
-        self.draw_score_box_for(4, score, ammo, false);
+        let mut first = (self.gs.score, self.gs.ammo);
+        let mut second = self.mp_p2_status();
+        // (player 2 took the lead: the first Keen's values are his)
+        if self.mp.flipped {
+            if let Some(s) = second {
+                second = Some(first);
+                first = s;
+            }
+        }
+        self.draw_score_box_for(4, first.0, first.1, false);
         // two player mode: player 2's box at the top right
-        if let Some((score, ammo)) = self.mp_p2_status() {
+        if let Some((score, ammo)) = second {
             let idx = (SCOREBOXSPR - super::consts::STARTSPRITES as i32) as usize;
             let w = self.gfx.sprites.get(idx).map_or(0, |t| t.w as i32 / scale);
             let x = self.cam.view_w() - w - 4;

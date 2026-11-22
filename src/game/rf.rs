@@ -537,7 +537,7 @@ impl Game {
             self.rf.order += 1;
             -self.rf.order
         };
-        let alt = self.mp.p2 == Some(ob);
+        let alt = self.mp_is_player2(ob);
         // (two player mode: Keen 2 is drawn 2 pixels higher, so the Keens
         // never cover each other completely)
         let y = if alt { y - super::mp::ALTYOFFSET } else { y };

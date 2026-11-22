@@ -685,7 +685,7 @@ struct LoadedGame {
     scoreobj: usize,
     /// two player mode (not in older saves): player 2's object, score,
     /// next extra life, shots, out of lives
-    mp: Option<(Option<usize>, i32, i32, i32, bool)>,
+    mp: Option<(Option<usize>, i32, i32, i32, bool, bool)>,
 }
 
 /// marks the two player part at the end of a saved game
@@ -2644,6 +2644,7 @@ impl Game {
                 w.i32(v);
             }
             w.bool(self.mp.out);
+            w.bool(self.mp.flipped);
         }
         if let Some(d) = path.parent() {
             std::fs::create_dir_all(d).map_err(|e| io_error_text(&e))?;
@@ -2722,7 +2723,10 @@ impl Game {
         let scoreobj = r.opt(count)?.ok_or_else(|| "Bad saved game".to_string())?;
         let mp = if d.get(r.pos..r.pos + MPMAGIC.len()) == Some(&MPMAGIC[..]) {
             r.pos += MPMAGIC.len();
-            Some((r.opt(count)?, r.i32()?, r.i32()?, r.i32()?, r.bool()?))
+            let (ob, score, nextextra, ammo, out) = (r.opt(count)?, r.i32()?, r.i32()?, r.i32()?, r.bool()?);
+            // (player 2 leading: not in saves of 0.3.2 and older)
+            let flipped = if r.pos < d.len() { r.bool()? } else { false };
+            Some((ob, score, nextextra, ammo, out, flipped))
         } else {
             None
         };
@@ -2802,12 +2806,13 @@ impl Game {
         // without it)
         self.mp_new_game();
         let mut p2 = None;
-        if let Some((ob, score, nextextra, ammo, out)) = l.mp {
+        if let Some((ob, score, nextextra, ammo, out, flipped)) = l.mp {
             let o = &mut self.mp.other;
             o.score = score;
             o.nextextra = nextextra;
             o.ammo = ammo;
             self.mp.out = out;
+            self.mp.flipped = flipped;
             p2 = ob;
         }
         self.mp_after_load(p2);

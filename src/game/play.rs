@@ -198,12 +198,18 @@ impl Game {
         let i = &self.sys.input;
         // (two player mode: the keyboard may belong to player 2)
         let fire = (!i.keyboard_is_p2() && i.key(self.firescan)) || i.pad_fire;
-        self.apply_controls(c, fire);
+        if self.mp.p2.is_none() && !self.mp.flipped {
+            self.apply_controls(c, fire);
+            return;
+        }
+        let i = &self.sys.input;
+        let c2 = i.read_control_p2();
+        let fire2 = if i.pad_count < 2 { i.key(self.firescan) } else { i.pad2_fire };
+        // (player 2 took the lead: he plays the first Keen)
+        let (lead, second) = if self.mp.flipped { ((c2, fire2), (c, fire)) } else { ((c, fire), (c2, fire2)) };
+        self.apply_controls(lead.0, lead.1);
         if self.mp.p2.is_some() {
-            let i = &self.sys.input;
-            let c2 = i.read_control_p2();
-            let fire2 = if i.pad_count < 2 { i.key(self.firescan) } else { i.pad2_fire };
-            self.as_p2(|g| g.apply_controls(c2, fire2));
+            self.as_p2(|g| g.apply_controls(second.0, second.1));
         }
     }
 
@@ -801,7 +807,7 @@ impl Game {
         self.fireheld = false;
         self.inlevel = true;
         self.playstate = EX_STILLPLAYING;
-        self.sys.input.split = self.mp_in_level();
+        self.sys.input.split = self.mp_in_level() || self.mp.flipped;
         self.pogodelay = 0;
         self.scrolllock = false;
         self.invincible = 0;
@@ -928,7 +934,10 @@ impl Game {
                             }
                         }
                     } else if self.objs[ob].obclass == KEENOBJ {
-                        self.playstate = EX_DIED;
+                        // (two player mode: player 2 may go on)
+                        if !(ob == self.player && self.mp_leader_fell()) {
+                            self.playstate = EX_DIED;
+                        }
                     } else {
                         self.remove_obj(ob);
                         cur = nx;

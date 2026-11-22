@@ -110,8 +110,13 @@ runtime and are never committed.
   (`Input::split`, `read_control_p2`). `Game::as_p2` swaps player 2's
   globals (`player`, `c`, buttons, `gs.score`/`ammo`/`riding`,
   `invincible`, ...) in, so the ported code runs unchanged for him; the
-  play loop calls his think/contact/tiles/react through it. Shots carry
-  `Obj::owner`; the other player's shot makes Keen dizzy (on the ground
+  play loop calls his think/contact/tiles/react through it. When player 1 dies while
+  player 2 lives, `mp_handover` exchanges the two Keen objects' contents
+  (the first stays `player`, the list head) and their globals;
+  `MpState::flipped` (saved) maps controls, colors and score boxes to the
+  people until the level ends. Shots carry
+  `Obj::owner`; the other player's shot makes Keen dizzy (knocked off the
+  pogo stick) (on the ground
   drawn sitting with Keen 6's stunned sprite, `Gfx::stunned`, which Keen
   4/5 borrow from a KEEN6 directory next to theirs if there is one). Player 2's
   sprites are recolored (`Gfx::alt_sprite`, `SpriteSlot::alt`); saves get

@@ -13,6 +13,14 @@
 //! items stay shared; score and shots are per player (both get the shots
 //! found). Stunner shots stun the other Keen: he is dizzy for two seconds.
 //!
+//! When player 1 dies while player 2 is still alive, player 2 takes the
+//! lead (`mp_handover`): the two Keen objects exchange their contents and
+//! their globals, so the living Keen is `player` again (the camera follows
+//! him) and the dying one comes back as the second Keen for a shared life.
+//! `MpState::flipped` then tells that the first Keen is played by the
+//! second player (controls, colors and score boxes follow the people, not
+//! the objects) until the level ends.
+//!
 //! Never active in demos or with --classic, so the original code paths
 //! (and the demo playback) stay as they were.
 
@@ -86,6 +94,10 @@ pub struct MpState {
     pub trail: Vec<(i32, i32, i32)>,
     /// world map: Keen 2's direction (dir_* id) for his standing shape
     pub world_dir: i32,
+    /// player 1 died and player 2 took the lead: `player` (the first Keen,
+    /// the camera follows him) is played by player 2, the second Keen by
+    /// player 1 (until the level ends)
+    pub flipped: bool,
 }
 
 impl Game {
@@ -143,6 +155,78 @@ impl Game {
         o.nextextra = 20000;
         o.ammo = 5;
         self.mp.out = false;
+        self.mp.flipped = false;
+    }
+
+    /// The Keen object `ob` is played by player 2 (drawn recolored).
+    pub fn mp_is_player2(&self, ob: usize) -> bool {
+        match self.mp_player_of(ob) {
+            Some(n) => (n == 1) != self.mp.flipped,
+            None => false,
+        }
+    }
+
+    /// Exchanges the per player globals (score, shots, buttons, ...) but
+    /// not the objects.
+    fn mp_exchange_vars(&mut self) {
+        let (p, op) = (self.player, self.mp.other.player);
+        self.mp_swap();
+        self.mp.swapped = !self.mp.swapped;
+        self.player = p;
+        self.mp.other.player = op;
+    }
+
+    /// Back to player 1 leading (a new level or the world map).
+    fn mp_unflip(&mut self) {
+        if self.mp.flipped {
+            self.mp_exchange_vars();
+            self.mp.flipped = false;
+        }
+    }
+
+    /// Player 1 died (or fell out of the map with `force`) while player 2
+    /// is alive: player 2 takes the lead. The two Keen objects exchange
+    /// everything but their place in the object list (the first one stays
+    /// `player`, which the original code relies on), the per player
+    /// globals, dizziness and the owners of the flying shots. True if done.
+    pub fn mp_handover(&mut self, force: bool) -> bool {
+        let Some(p2) = self.mp.p2 else { return false };
+        if self.mp.swapped || self.mp_p2_dying(p2) || self.objs[p2].obclass != KEENOBJ {
+            return false;
+        }
+        let p1 = self.player;
+        let s = self.objs[p1].state;
+        if !force && !(same(s, &S_KEENDIE1) || same(s, &S_KEENDIE2) || same(s, &S_KEENDEAD)) {
+            return false;
+        }
+        let (a, b) = (self.objs[p1].clone(), self.objs[p2].clone());
+        self.objs[p1] = super::defs::Obj { prev: a.prev, next: a.next, ..b };
+        self.objs[p2] = super::defs::Obj { prev: b.prev, next: b.next, ..a };
+        self.rf.sprites.swap(p1, p2);
+        self.rf.stars.swap(p1, p2);
+        self.mp_exchange_vars();
+        self.mp.dizzy.swap(0, 1);
+        self.mp.flipped = !self.mp.flipped;
+        self.mp.away = 0;
+        // (KillKeen locked the camera on the dying Keen)
+        self.scrolllock = false;
+        for i in 0..self.objs.len() {
+            if !self.obj_free[i] && self.objs[i].obclass == STUNSHOTOBJ && matches!(self.objs[i].owner, 1 | 2) {
+                self.objs[i].owner = 3 - self.objs[i].owner;
+            }
+        }
+        true
+    }
+
+    /// From the play loop: the first Keen fell out of the map. With player
+    /// 2 alive he takes the lead and the fallen one costs a life like player
+    /// 2 does; false if the level is lost.
+    pub fn mp_leader_fell(&mut self) -> bool {
+        if !self.mp_handover(true) {
+            return false;
+        }
+        self.mp_p2_died();
+        true
     }
 
     /// Exchanges the globals of the two players.
@@ -235,6 +319,7 @@ impl Game {
         self.explode_shot(hit);
         self.mp.dizzy[n] = DIZZYTICS;
         self.play_sound(super::keen::SND_HELMETHIT);
+        self.mp_knock_off_pogo(n, ob);
         true
     }
 
@@ -244,6 +329,7 @@ impl Game {
     /// the world map and not where Keen doesn't start on his feet, like
     /// Keen 4's underwater level).
     pub fn mp_setup_level(&mut self) {
+        self.mp_unflip();
         self.mp.p2 = None;
         self.mp.respawn = 0;
         self.mp.away = 0;
@@ -277,6 +363,7 @@ impl Game {
             if let Some(n) = p2 {
                 self.remove_obj(n);
             }
+            self.mp_unflip();
             return;
         }
         match p2 {
@@ -387,6 +474,10 @@ impl Game {
     /// 2 back when he is off screen too long, coming back after dying,
     /// dizziness.
     pub fn mp_tick(&mut self) {
+        // player 1 dies: player 2 goes on
+        if self.mp.p2.is_some() && !self.mp.swapped && self.keen_dying() {
+            self.mp_handover(false);
+        }
         if !self.mp_in_level() {
             return;
         }
@@ -436,9 +527,10 @@ impl Game {
             let Some(ob) = ob else { continue };
             if self.mp.dizzy[n] > 0 {
                 self.mp.dizzy[n] = (self.mp.dizzy[n] - tics).max(0);
+                self.mp_knock_off_pogo(n, ob);
                 // on the ground he sits dazed, the stars lower
                 let down = if self.mp_sit_dizzy(ob) { 0x80 } else { 0 };
-                let (x, y) = (self.objs[ob].x - 0x20, self.objs[ob].y - 0x90 + down);
+                let (x, y) = (self.objs[ob].x, self.objs[ob].y - 0x90 + down);
                 self.place_stars(ob, x, y, super::ep::STARSPR + frame, 3);
             } else {
                 self.remove_stars(ob);
@@ -518,6 +610,25 @@ impl Game {
             stunned: false,
         };
         self.rf.extra = vec![slot];
+    }
+
+    /// A dizzy Keen falls off his pogo stick (and sits dazed once he
+    /// lands). `n`: his player number (0, 1) of the object `ob`.
+    fn mp_knock_off_pogo(&mut self, n: usize, ob: usize) {
+        let Some(st) = self.objs[ob].state else { return };
+        if !(same(Some(st), &S_KEENPOGO) || same(Some(st), &S_KEENPOGO2) || same(Some(st), &S_KEENPOGODOWN)) {
+            return;
+        }
+        let knock = move |g: &mut Game| {
+            g.jumptime = 0;
+            g.objs[ob].xspeed = 0;
+            g.change_state(ob, &S_KEENFALL1);
+        };
+        if n == 1 && !self.mp.swapped {
+            self.as_p2(knock);
+        } else {
+            knock(self);
+        }
     }
 
     /// A dizzy Keen standing on the ground (or idling: the idle
@@ -716,6 +827,61 @@ mod tests {
         // player 2 (keyboard with one gamepad) is not dizzy
         assert!(g.mp.other.jumpbutton);
         let _ = p2;
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn player2_takes_over_when_player1_dies() {
+        let tmp = std::env::temp_dir().join(format!("keen-mp-lead-{}-{}", super::super::EPISODE, std::process::id()));
+        let _ = std::fs::create_dir_all(&tmp);
+        let Some(mut g) = two_player_game(&tmp) else { return };
+        let (p1, p2) = (g.player, g.mp.p2.unwrap());
+        g.gs.score = 100;
+        g.mp.other.score = 200;
+        g.objs[p2].x += 0x100;
+        let x2 = g.objs[p2].x;
+        let lives = g.gs.lives;
+        g.kill_keen();
+        assert!(g.keen_dying());
+        g.mp_tick();
+        // player 2's Keen is the first object now, alive, with his globals
+        assert!(g.mp.flipped);
+        assert_eq!((g.player, g.mp.p2), (p1, Some(p2)));
+        assert!(!g.keen_dying() && !g.scrolllock);
+        assert_eq!(g.objs[p1].x, x2);
+        assert_eq!((g.gs.score, g.mp.other.score), (200, 100));
+        assert!(g.mp_is_player2(p1) && !g.mp_is_player2(p2));
+        assert!(g.mp_p2_dying(p2));
+        // the dead player 1 costs a life and comes back as the second Keen
+        g.as_p2(|g| g.playstate = EX_DIED);
+        assert_eq!(g.playstate, EX_STILLPLAYING);
+        assert_eq!(g.gs.lives, lives - 1);
+        assert!(g.mp.respawn > 0);
+        // saved and loaded: still player 2 leading
+        g.save_state();
+        g.mp.flipped = false;
+        g.load_state();
+        assert!(g.mp.flipped);
+        // the next level: player 1 leads again, with his own score
+        g.mp_setup_level();
+        assert!(!g.mp.flipped);
+        assert_eq!((g.gs.score, g.mp.other.score), (100, 200));
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn shot_off_the_pogo_stick() {
+        let tmp = std::env::temp_dir().join(format!("keen-mp-pogo-{}-{}", super::super::EPISODE, std::process::id()));
+        let _ = std::fs::create_dir_all(&tmp);
+        let Some(mut g) = two_player_game(&tmp) else { return };
+        let p2 = g.mp.p2.unwrap();
+        g.as_p2(|g| g.change_state(p2, &S_KEENPOGO));
+        let shot = g.get_new_obj(false);
+        g.objs[shot].obclass = STUNSHOTOBJ;
+        g.objs[shot].state = Some(&super::super::states::S_STUNRAY1);
+        g.objs[shot].owner = 1;
+        g.as_p2(|g| assert!(g.mp_shot_hits_keen(p2, shot)));
+        assert!(same(g.objs[p2].state, &S_KEENFALL1));
         let _ = std::fs::remove_dir_all(&tmp);
     }
 }
