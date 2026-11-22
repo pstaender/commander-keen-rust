@@ -11,6 +11,8 @@ pub mod keen;
 pub mod keen2;
 #[path = "../game/menu.rs"]
 pub mod menu;
+#[path = "../game/mp.rs"]
+pub mod mp;
 #[path = "../game/objects.rs"]
 pub mod objects;
 #[path = "../game/phys.rs"]

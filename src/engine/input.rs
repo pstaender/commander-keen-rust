@@ -431,6 +431,17 @@ pub struct Input {
     pub pad_fire: bool,
     /// a gamepad is connected
     pub pad_connected: bool,
+    /// number of connected gamepads
+    pub pad_count: usize,
+    /// two player mode (not in the original): the first gamepad plays
+    /// Keen, the second one (`pad2_*`), or the keyboard if there is only one
+    /// gamepad, the second Keen. Set by the game while a level runs.
+    pub split: bool,
+    pub pad2_x: i32,
+    pub pad2_y: i32,
+    pub pad2_jump: bool,
+    pub pad2_pogo: bool,
+    pub pad2_fire: bool,
     /// gamepad bindings, indexed by PAD_UP..PAD_LOADSTATE
     pub pad_map: [PadInput; PAD_ACTIONS],
     /// the save / load state actions were pressed (consumed by the game)
@@ -465,6 +476,13 @@ impl Default for Input {
             pad_pogo: false,
             pad_fire: false,
             pad_connected: false,
+            pad_count: 0,
+            split: false,
+            pad2_x: 0,
+            pad2_y: 0,
+            pad2_jump: false,
+            pad2_pogo: false,
+            pad2_fire: false,
             pad_map: default_pad_map(),
             pad_save: false,
             pad_load: false,
@@ -492,10 +510,31 @@ impl Input {
         self.last_ascii = 0;
     }
 
+    /// In two player mode the keyboard belongs to the second player.
+    pub fn keyboard_is_p2(&self) -> bool {
+        self.split && self.pad_count < 2
+    }
+
     /// Reads the keyboard control scheme (IN_ReadControl, keyboard part).
+    /// In two player mode: the first player's controls (see `split`).
     pub fn read_control(&self) -> ControlInfo {
+        let keys = !self.keyboard_is_p2();
+        self.control_from(keys, self.pad_x, self.pad_y, self.pad_jump, self.pad_pogo)
+    }
+
+    /// Two player mode: the second player's controls (second gamepad, or
+    /// the keyboard if there is only one gamepad).
+    pub fn read_control_p2(&self) -> ControlInfo {
+        if self.pad_count < 2 {
+            self.control_from(true, 0, 0, false, false)
+        } else {
+            self.control_from(false, self.pad2_x, self.pad2_y, self.pad2_jump, self.pad2_pogo)
+        }
+    }
+
+    fn control_from(&self, keys: bool, pad_x: i32, pad_y: i32, pad_jump: bool, pad_pogo: bool) -> ControlInfo {
         let d = &self.key_def;
-        let k = |s| self.key(s);
+        let k = |s| keys && self.key(s);
         let mut mx = 0i32;
         let mut my = 0i32;
         if k(d.upleft) {
@@ -521,11 +560,11 @@ impl Input {
         } else if k(d.right) {
             mx = 1;
         }
-        if self.pad_x != 0 {
-            mx = self.pad_x;
+        if pad_x != 0 {
+            mx = pad_x;
         }
-        if self.pad_y != 0 {
-            my = self.pad_y;
+        if pad_y != 0 {
+            my = pad_y;
         }
         let dir = match (mx, my) {
             (-1, -1) => Direction::NorthWest,
@@ -539,8 +578,8 @@ impl Input {
             _ => Direction::None,
         };
         ControlInfo {
-            button0: k(d.button0) || self.pad_jump,
-            button1: k(d.button1) || self.pad_pogo,
+            button0: k(d.button0) || pad_jump,
+            button1: k(d.button1) || pad_pogo,
             button2: false, xaxis: mx, yaxis: my, dir }
     }
 }

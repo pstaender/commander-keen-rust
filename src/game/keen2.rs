@@ -70,14 +70,37 @@ impl Game {
         if !self.showscorebox {
             return;
         }
-        self.draw_overlay_sprite(SCOREBOXSPR, 4, 4, scale);
-        let base_x = 4 + self.sprite_origin(SCOREBOXSPR).0;
+        let (score, ammo) = (self.gs.score, self.gs.ammo);
+        self.draw_score_box_for(4, score, ammo, false);
+        // two player mode: player 2's box at the top right
+        if let Some((score, ammo)) = self.mp_p2_status() {
+            let idx = (SCOREBOXSPR - super::consts::STARTSPRITES as i32) as usize;
+            let w = self.gfx.sprites.get(idx).map_or(0, |t| t.w as i32 / scale);
+            let x = self.cam.view_w() - w - 4;
+            self.draw_score_box_for(x, score, ammo, true);
+        }
+    }
+
+    /// One score box at (x, 4): score, shots and the (shared) lives.
+    fn draw_score_box_for(&mut self, x: i32, score: i32, ammo: i32, alt: bool) {
+        let scale = self.sys.surface.scale as i32;
+        if alt {
+            let idx = (SCOREBOXSPR - super::consts::STARTSPRITES as i32) as usize;
+            let (ox, oy) = self.sprite_origin(SCOREBOXSPR);
+            if idx < self.gfx.sprites.len() {
+                let t = self.gfx.alt_sprite(idx);
+                self.sys.surface.blit_phys(t, (x + ox) * scale, (4 + oy) * scale);
+            }
+        } else {
+            self.draw_overlay_sprite(SCOREBOXSPR, x, 4, scale);
+        }
+        let base_x = x + self.sprite_origin(SCOREBOXSPR).0;
         let base_y = 4 + self.sprite_origin(SCOREBOXSPR).1;
         // score: 9 digits at (8,4)
-        let s = self.gs.score.to_string();
+        let s = score.to_string();
         self.draw_score_digits(&s, 9, base_x + 8, base_y + 4);
         // ammo: 2 digits at (64,20)
-        let a = if self.gs.ammo < 100 { self.gs.ammo.to_string() } else { "99".into() };
+        let a = if ammo < 100 { ammo.to_string() } else { "99".into() };
         self.draw_score_digits(&a, 2, base_x + 64, base_y + 20);
         // lives: 2 digits at (24,20)
         let l = if self.gs.lives < 100 { self.gs.lives.to_string() } else { "99".into() };
@@ -442,6 +465,7 @@ impl Game {
             o.obclass = STUNSHOTOBJ;
             o.active = AC_ALLWAYS;
         }
+        self.objs[n].owner = self.mp_shot_owner();
         self.play_sound(super::keen::SND_KEENFIRE);
         let (xd, yd) = match dir {
             0 => (0, -1),
@@ -459,9 +483,14 @@ impl Game {
         if ep_sel!(true, true, false) {
             return;
         }
-        // hit something right away?
-        let mut i = self.objs[self.player].next;
+        // hit something right away? (two player mode: player 2 shooting
+        // checks the objects before him too, but not himself)
+        let mut i = self.objs[self.mp_first_obj()].next;
         while let Some(h) = i {
+            if h == self.player {
+                i = self.objs[h].next;
+                continue;
+            }
             let s = &self.objs[n];
             let o = &self.objs[h];
             if o.active != AC_NO

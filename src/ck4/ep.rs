@@ -49,7 +49,7 @@ pub fn keen_contact(g: &mut Game, ob: usize, hit: usize) {
             } else if k == 10 {
                 g.gs.lives += 1;
             } else if k == 11 {
-                g.gs.ammo += AMMOBYDIFF[g.gs.difficulty.clamp(0, 3) as usize];
+                g.give_ammo(AMMOBYDIFF[g.gs.difficulty.clamp(0, 3) as usize]);
             }
             g.change_state(hit, &S_BONUSRISE);
         }

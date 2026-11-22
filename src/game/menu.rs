@@ -117,6 +117,8 @@ const SOUND_VOLUME_ITEM: usize = 4;
 const MUSIC_VOLUME_ITEM: usize = 3;
 /// the MIDI MUSIC entry of MUSICCARD
 const MUSIC_MIDI_ITEM: usize = 2;
+/// the TWO PLAYERS entry of PADCARD
+const PAD_TWOPLAYERS_ITEM: usize = 3;
 /// the gamepad actions of the PADMOVECARD and PADBUTTONSCARD entries
 const PADMOVE_ACTIONS: [usize; 4] = [PAD_UP, PAD_DOWN, PAD_LEFT, PAD_RIGHT];
 const PADBUTTON_ACTIONS: [usize; 6] = [PAD_JUMP, PAD_POGO, PAD_FIRE, PAD_MENU, PAD_SAVESTATE, PAD_LOADSTATE];
@@ -362,6 +364,8 @@ fn build_cards() -> Vec<Card> {
                 f(0x32, "CONFIGURE MOVEMENT", PADMOVECARD),
                 f(0x30, "CONFIGURE BUTTONS", PADBUTTONSCARD),
                 item(UII_BUTTON, UI_SEPARATED, 0x20, "DEFAULT LAYOUT", 0, None),
+                // removed with --classic
+                item(UII_BUTTON, UI_SEPARATED, 0x14, "TWO PLAYERS (OFF)", 0, None),
             ],
             Custom::Pad,
             0,
@@ -638,6 +642,7 @@ fn read_obj(r: &mut Reader, limit: usize) -> Result<Obj, String> {
         temp2: u[17],
         temp3: u[18],
         temp4: u[19],
+        owner: 0,
         sprite,
         next,
         prev,
@@ -668,7 +673,13 @@ struct LoadedGame {
     objectcount: i32,
     player: usize,
     scoreobj: usize,
+    /// two player mode (not in older saves): player 2's object, score,
+    /// next extra life, shots, out of lives
+    mp: Option<(Option<usize>, i32, i32, i32, bool)>,
 }
+
+/// marks the two player part at the end of a saved game
+const MPMAGIC: &[u8; 4] = b"MP2\0";
 
 impl Game {
     // ---- small helpers ------------------------------------------------------
@@ -1107,6 +1118,10 @@ impl Game {
         if two {
             fire.flags |= UI_DISABLED;
         }
+        let mp = self.mp.enabled;
+        if let Some(it) = self.menu.cards[PADCARD].items.get_mut(PAD_TWOPLAYERS_ITEM) {
+            it.text = if mp { "TWO PLAYERS (ON)" } else { "TWO PLAYERS (OFF)" };
+        }
     }
 
     /// USL_ScoreCustom (0x29d17)
@@ -1289,6 +1304,21 @@ impl Game {
             UIC_HIT if i == Some(2) => {
                 self.sys.input.pad_map = default_pad_map();
                 self.usl_ctl_dialog("Default gamepad layout", "Press any key", None);
+                self.usl_draw_ctl_panel();
+                true
+            }
+            // two player mode (from the next level on)
+            UIC_HIT if i == Some(PAD_TWOPLAYERS_ITEM) => {
+                self.mp.enabled = !self.mp.enabled;
+                self.usl_set_options_text();
+                let s2 = if !self.mp.enabled {
+                    "One player"
+                } else if self.sys.input.pad_count >= 2 {
+                    "Player 2: second gamepad"
+                } else {
+                    "Player 2: keyboard"
+                };
+                self.usl_ctl_dialog(if self.mp.enabled { "Two players on" } else { "Two players off" }, s2, Some("Press any key"));
                 self.usl_draw_ctl_panel();
                 true
             }
@@ -2171,6 +2201,7 @@ impl Game {
                 self.menu.cards[PADBUTTONSCARD].items.truncate(4);
                 self.menu.cards[SOUNDCARD].items.truncate(SOUND_VOLUME_ITEM);
                 self.menu.cards[MUSICCARD].items.truncate(MUSIC_MIDI_ITEM);
+                self.menu.cards[PADCARD].items.truncate(PAD_TWOPLAYERS_ITEM);
             }
         }
         self.usl_check_saved_games();
@@ -2587,6 +2618,16 @@ impl Game {
         w.i32(self.objectcount);
         w.i32(self.player as i32);
         w.i32(self.scoreobj as i32);
+        // two player mode: player 2 (older versions ignore the rest)
+        if self.mp_in_level() || self.mp.out {
+            w.0.extend_from_slice(MPMAGIC);
+            w.opt(self.mp.p2);
+            let o = &self.mp.other;
+            for v in [o.score, o.nextextra, o.ammo] {
+                w.i32(v);
+            }
+            w.bool(self.mp.out);
+        }
         if let Some(d) = path.parent() {
             std::fs::create_dir_all(d).map_err(|e| io_error_text(&e))?;
         }
@@ -2662,7 +2703,13 @@ impl Game {
         let objectcount = r.i32()?;
         let player = r.opt(count)?.ok_or_else(|| "Bad saved game".to_string())?;
         let scoreobj = r.opt(count)?.ok_or_else(|| "Bad saved game".to_string())?;
-        Ok(LoadedGame { gs, mapwidth, mapheight, planes, objs, obj_free, objfreelist, lastobj, objectcount, player, scoreobj })
+        let mp = if d.get(r.pos..r.pos + MPMAGIC.len()) == Some(&MPMAGIC[..]) {
+            r.pos += MPMAGIC.len();
+            Some((r.opt(count)?, r.i32()?, r.i32()?, r.i32()?, r.bool()?))
+        } else {
+            None
+        };
+        Ok(LoadedGame { gs, mapwidth, mapheight, planes, objs, obj_free, objfreelist, lastobj, objectcount, player, scoreobj, mp })
     }
 
     /// LoadTheGame (0x159ea) from our own format.
@@ -2734,6 +2781,19 @@ impl Game {
         s.temp2 = -1;
         s.temp3 = -1;
         s.temp4 = -1;
+        // two player mode: player 2's part (a new player 2 for saves
+        // without it)
+        self.mp_new_game();
+        let mut p2 = None;
+        if let Some((ob, score, nextextra, ammo, out)) = l.mp {
+            let o = &mut self.mp.other;
+            o.score = score;
+            o.nextextra = nextextra;
+            o.ammo = ammo;
+            self.mp.out = out;
+            p2 = ob;
+        }
+        self.mp_after_load(p2);
         self.rf_new_map();
         self.rf_mark_tile_graphics_public();
         let p = self.player;
@@ -2967,6 +3027,8 @@ impl Game {
                 "compatibility" => self.menu.compatibility = n == 1,
                 "jerk" => self.menu.jerk = n == 1,
                 "twobutton" => self.twobutton = n == 1,
+                // (--two-players turns it on whatever the config says)
+                "twoplayers" => self.mp.enabled = n == 1 || self.opts.two_players,
                 "controltype" => self.menu.controltype = 0,
                 "button0" => d.button0 = sc.unwrap_or(d.button0),
                 "button1" => d.button1 = sc.unwrap_or(d.button1),
@@ -3031,6 +3093,7 @@ impl Game {
         if super::EPISODE == 5 {
             text += &format!("jerk={}\n", b(self.menu.jerk));
         }
+        text += &format!("twoplayers={}\n", b(self.mp.enabled));
         for (k, p) in PAD_ACTION_KEYS.iter().zip(self.sys.input.pad_map) {
             text += &format!("{}={}\n", k, p.encode());
         }

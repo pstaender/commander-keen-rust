@@ -192,16 +192,33 @@ impl Game {
         }
     }
 
-    /// PollControls (0x18413)
+    /// PollControls (0x18413); in two player mode for both players.
     pub fn poll_controls(&mut self) {
-        self.c = self.read_control();
+        let c = self.read_control();
+        let i = &self.sys.input;
+        // (two player mode: the keyboard may belong to player 2)
+        let fire = (!i.keyboard_is_p2() && i.key(self.firescan)) || i.pad_fire;
+        self.apply_controls(c, fire);
+        if self.mp.p2.is_some() {
+            let i = &self.sys.input;
+            let c2 = i.read_control_p2();
+            let fire2 = if i.pad_count < 2 { i.key(self.firescan) } else { i.pad2_fire };
+            self.as_p2(|g| g.apply_controls(c2, fire2));
+        }
+    }
+
+    /// The rest of PollControls with the control state read.
+    fn apply_controls(&mut self, c: ControlInfo, fire: bool) {
+        // two player mode: a dizzy Keen can't do anything
+        let (c, fire) = if self.mp_dizzy() { (ControlInfo::default(), false) } else { (c, fire) };
+        self.c = c;
         if self.c.yaxis != -1 {
             self.upheld = false;
         }
         if !self.twobutton && self.demomode == 0 {
             self.jumpbutton = self.c.button0;
             self.pogobutton = self.c.button1;
-            self.firebutton = self.sys.input.key(self.firescan) || self.sys.input.pad_fire;
+            self.firebutton = fire;
             if !self.jumpbutton {
                 self.jumpheld = false;
             }
@@ -784,6 +801,7 @@ impl Game {
         self.fireheld = false;
         self.inlevel = true;
         self.playstate = EX_STILLPLAYING;
+        self.sys.input.split = self.mp_in_level();
         self.pogodelay = 0;
         self.scrolllock = false;
         self.invincible = 0;
@@ -836,7 +854,11 @@ impl Game {
                             }
                         }
                     }
-                    self.state_machine(ob);
+                    if Some(ob) == self.mp.p2 {
+                        self.as_p2(|g| g.state_machine(ob));
+                    } else {
+                        self.state_machine(ob);
+                    }
                     // like the original, a removed object keeps its next link
                     cur = self.objs[ob].next;
                     continue;
@@ -846,6 +868,9 @@ impl Game {
             if self.gs.riding.is_some() {
                 let p = self.player;
                 self.handle_riding(p);
+            }
+            if let Some(p2) = self.mp.p2 {
+                self.as_p2(|g| g.handle_riding(p2));
             }
             // contacts
             let mut cur = Some(self.player);
@@ -860,11 +885,12 @@ impl Game {
                             && (a.top as u16) < (b.bottom as u16)
                             && (b.top as u16) < (a.bottom as u16)
                         {
+                            // (as player 2 if it is about him)
                             if let Some(c) = self.objs[ob].state.and_then(|s| s.contact) {
-                                c(self, ob, h);
+                                self.mp_contact(c, ob, h);
                             }
                             if let Some(c) = self.objs[h].state.and_then(|s| s.contact) {
-                                c(self, h, ob);
+                                self.mp_contact(c, h, ob);
                             }
                             if self.objs[ob].obclass == NOTHING {
                                 break;
@@ -880,11 +906,19 @@ impl Game {
                 self.check_world_in_tiles(p);
             } else {
                 self.check_in_tiles(p);
+                if let Some(p2) = self.mp.p2 {
+                    self.as_p2(|g| g.check_in_tiles(p2));
+                }
             }
             // reactions
             let mut cur = Some(self.player);
             while let Some(ob) = cur {
                 let nx = self.objs[ob].next;
+                if Some(ob) == self.mp.p2 {
+                    self.mp_react_p2(ob);
+                    cur = self.objs[ob].next;
+                    continue;
+                }
                 if self.objs[ob].active != AC_NO {
                     if (self.objs[ob].tilebottom as u16) < (self.mapheight - 1) as u16 {
                         if self.objs[ob].needtoreact {
@@ -910,6 +944,8 @@ impl Game {
             } else {
                 self.scroll_screen(p);
             }
+            self.mp_tick();
+            self.mp_world_tick();
             if self.loadedgame {
                 self.loadedgame = false;
             }
@@ -952,6 +988,7 @@ impl Game {
             }
         }
         self.inlevel = false;
+        self.sys.input.split = false;
         self.stop_music();
     }
 

@@ -136,6 +136,9 @@ pub struct Obj {
     pub temp2: i32,
     pub temp3: i32,
     pub temp4: i32,
+    /// two player mode: the player (1, 2) who fired a stunner shot, 0 for
+    /// other objects (not in the original)
+    pub owner: u8,
     /// sprite is visible (RF sprite allocated)
     pub sprite: bool,
     /// for stunned objects: the stars sprite (shape) and visibility

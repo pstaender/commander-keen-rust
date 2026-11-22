@@ -249,7 +249,11 @@ impl Sys {
             palette: Palette::default(),
             border: 0,
             // headless testing: KEEN_PAD=1 pretends a gamepad is connected
-            input: Input { pad_connected: headless && std::env::var("KEEN_PAD").is_ok_and(|v| v == "1"), ..Input::default() },
+            // (KEEN_PAD=2: two gamepads)
+            input: {
+                let n = if headless { std::env::var("KEEN_PAD").ok().and_then(|v| v.parse().ok()).unwrap_or(0) } else { 0 };
+                Input { pad_connected: n > 0, pad_count: n, ..Input::default() }
+            },
             start: Instant::now(),
             time_offset: 0,
             quit: false,
@@ -480,11 +484,15 @@ impl Sys {
             }
         }
         i.pad_connected = g.gamepads().next().is_some();
+        i.pad_count = g.gamepads().count();
         let mut act = [false; PAD_ACTIONS];
-        for (id, pad) in g.gamepads() {
+        // two player mode: the actions of the first and the second pad
+        let mut per_pad = [[false; PAD_ACTIONS]; 2];
+        for (n, (id, pad)) in g.gamepads().enumerate() {
             let dpad = self.pad_dpad.get(&usize::from(id)).copied().unwrap_or_default();
+            let mut a = [false; PAD_ACTIONS];
             for (k, &b) in i.pad_map.iter().enumerate() {
-                act[k] |= pad_active(&pad, b, dpad, &self.pad_dpad_codes);
+                a[k] |= pad_active(&pad, b, dpad, &self.pad_dpad_codes);
             }
             let (ax, ay) = if pad.mapping_source() == MappingSource::None {
                 // unmapped: the raw X/Y axes or the hat switch (HID: down
@@ -496,10 +504,16 @@ impl Sys {
             } else {
                 (pad.value(Axis::LeftStickX), pad.value(Axis::LeftStickY))
             };
-            act[PAD_LEFT] |= ax < -0.5;
-            act[PAD_RIGHT] |= ax > 0.5;
-            act[PAD_UP] |= ay > 0.5;
-            act[PAD_DOWN] |= ay < -0.5;
+            a[PAD_LEFT] |= ax < -0.5;
+            a[PAD_RIGHT] |= ax > 0.5;
+            a[PAD_UP] |= ay > 0.5;
+            a[PAD_DOWN] |= ay < -0.5;
+            for k in 0..PAD_ACTIONS {
+                act[k] |= a[k];
+            }
+            if n < 2 {
+                per_pad[n] = a;
+            }
         }
         let prev = std::mem::replace(&mut self.pad_prev, act);
         let pressed = |k: usize| act[k] && !prev[k];
@@ -508,6 +522,11 @@ impl Sys {
         i.pad_jump = false;
         i.pad_pogo = false;
         i.pad_fire = false;
+        i.pad2_x = 0;
+        i.pad2_y = 0;
+        i.pad2_jump = false;
+        i.pad2_pogo = false;
+        i.pad2_fire = false;
         if i.pad_capture {
             if captured.is_some() {
                 i.pad_captured = captured;
@@ -544,11 +563,18 @@ impl Sys {
             }
             return;
         }
-        i.pad_x = if act[PAD_LEFT] { -1 } else if act[PAD_RIGHT] { 1 } else { 0 };
-        i.pad_y = if act[PAD_UP] { -1 } else if act[PAD_DOWN] { 1 } else { 0 };
-        i.pad_jump = act[PAD_JUMP];
-        i.pad_pogo = act[PAD_POGO];
-        i.pad_fire = act[PAD_FIRE];
+        // two player mode: each pad plays its own Keen
+        let (p1, p2) = if i.split { (per_pad[0], per_pad[1]) } else { (act, [false; PAD_ACTIONS]) };
+        i.pad_x = if p1[PAD_LEFT] { -1 } else if p1[PAD_RIGHT] { 1 } else { 0 };
+        i.pad_y = if p1[PAD_UP] { -1 } else if p1[PAD_DOWN] { 1 } else { 0 };
+        i.pad_jump = p1[PAD_JUMP];
+        i.pad_pogo = p1[PAD_POGO];
+        i.pad_fire = p1[PAD_FIRE];
+        i.pad2_x = if p2[PAD_LEFT] { -1 } else if p2[PAD_RIGHT] { 1 } else { 0 };
+        i.pad2_y = if p2[PAD_UP] { -1 } else if p2[PAD_DOWN] { 1 } else { 0 };
+        i.pad2_jump = p2[PAD_JUMP];
+        i.pad2_pogo = p2[PAD_POGO];
+        i.pad2_fire = p2[PAD_FIRE];
         if pressed(PAD_JUMP) {
             i.last_scan = SC_SPACE;
         }

@@ -99,6 +99,8 @@ pub struct Game {
     pub lastlevel: i32,
     pub restartdifficulty: i32,
     pub demo: demo::DemoState,
+    /// two player mode (not in the original)
+    pub mp: mp::MpState,
 
     // per-module state of the ported CK6 modules
     pub act1: act1::ModState,
@@ -180,6 +182,7 @@ impl Game {
             lastlevel: -1,
             restartdifficulty: 0,
             demo: demo::DemoState::default(),
+            mp: mp::MpState::default(),
             act1: Default::default(),
             act2: Default::default(),
             act3: Default::default(),
@@ -188,6 +191,7 @@ impl Game {
             spec_tiles: Default::default(),
         };
         g.init_obj_array();
+        g.mp.enabled = g.opts.two_players;
         g
     }
 

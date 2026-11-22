@@ -85,6 +85,8 @@ pub struct SpriteSlot {
     pub order: i64,
     /// RF maskdraw: draw the sprite's shape in white
     pub white: bool,
+    /// two player mode: player 2's colors (not in the original)
+    pub alt: bool,
 }
 
 /// One animation group (allanims entry).
@@ -112,6 +114,9 @@ pub struct RfState {
     pub fg_group: Vec<i32>,
     pub sprites: Vec<SpriteSlot>,
     pub stars: Vec<SpriteSlot>,
+    /// sprites without an object (two player mode: Keen 2 on the world
+    /// map; not in the original)
+    pub extra: Vec<SpriteSlot>,
     /// counter for new sprite places (see `SpriteSlot::order`)
     pub order: i64,
     /// status window refresh hook active (StatusWindow scrolling)
@@ -128,6 +133,7 @@ impl Default for RfState {
             fg_group: vec![-1; NUMTILE16M],
             sprites: vec![SpriteSlot::default(); MAXACTORS + 1],
             stars: vec![SpriteSlot::default(); MAXACTORS + 1],
+            extra: Vec::new(),
             order: 0,
             hook: None,
             bg_hook: None,
@@ -304,6 +310,7 @@ impl Game {
         for s in self.rf.sprites.iter_mut().chain(self.rf.stars.iter_mut()) {
             s.visible = false;
         }
+        self.rf.extra.clear();
     }
 
     /// Widescreen: picks the play field width for the window's shape. The
@@ -528,7 +535,11 @@ impl Game {
             self.rf.order += 1;
             -self.rf.order
         };
-        self.rf.sprites[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false };
+        let alt = self.mp.p2 == Some(ob);
+        // (two player mode: Keen 2 is drawn 2 pixels higher, so the Keens
+        // never cover each other completely)
+        let y = if alt { y - super::mp::ALTYOFFSET } else { y };
+        self.rf.sprites[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false, alt };
         self.objs[ob].sprite = true;
     }
 
@@ -540,7 +551,7 @@ impl Game {
             self.rf.order += 1;
             -self.rf.order
         };
-        self.rf.stars[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false };
+        self.rf.stars[ob] = SpriteSlot { visible: true, x, y, shape, priority, order, white: false, alt: false };
     }
 
     /// Switches the placed sprite of `ob` to white (maskdraw) drawing.
@@ -587,7 +598,7 @@ impl Game {
         let px = (gpx - (self.cam.originxglobal >> 4)) as i16 as i32;
         let py = (gpy - (self.cam.originyglobal >> 4)) as i16 as i32;
         let (px, py) = (px * scale, py * scale);
-        let tex = &self.gfx.sprites[idx as usize];
+        let tex = if s.alt { self.gfx.alt_sprite(idx as usize) } else { &self.gfx.sprites[idx as usize] };
         if s.white {
             self.sys.surface.blit_phys_solid(tex, px, py, 0xffffffff);
         } else {
@@ -633,8 +644,9 @@ impl Game {
         }
         // sprites by priority, masked foreground tiles before priority 3
         let mut list: Vec<SpriteSlot> =
-            self.rf.sprites.iter().chain(self.rf.stars.iter()).filter(|s| s.visible).copied().collect();
-        list.sort_by_key(|s| (s.priority, s.order));
+            self.rf.sprites.iter().chain(self.rf.stars.iter()).chain(self.rf.extra.iter()).filter(|s| s.visible).copied().collect();
+        // (two player mode: Keen 2 first, i.e. behind Keen 1)
+        list.sort_by_key(|s| (s.priority, if s.alt { i64::MIN } else { s.order }));
         let mut i = 0;
         for pr in 0..PRIORITIES {
             if pr == MASKEDTILEPRIORITY {

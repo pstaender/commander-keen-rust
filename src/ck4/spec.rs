@@ -501,7 +501,7 @@ pub fn c_keen_swim(g: &mut Game, _ob: usize, hit: usize) {
             } else if k == 10 {
                 g.gs.lives += 1;
             } else if k == 11 {
-                g.gs.ammo += SHOTSINCLIP[g.gs.difficulty.clamp(0, 3) as usize];
+                g.give_ammo(SHOTSINCLIP[g.gs.difficulty.clamp(0, 3) as usize]);
             }
             g.change_state(hit, &S_BONUSRISE);
         }

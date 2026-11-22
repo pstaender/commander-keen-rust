@@ -26,4 +26,6 @@ pub struct Options {
     /// no_auto_save, no quick save (gamepad save/load state, the load menu's
     /// second page, --cheatmode F2/F3), no MIDI music and no volume bars
     pub classic: bool,
+    /// --two-players: two player mode on (also CONFIGURE > USE GAMEPAD)
+    pub two_players: bool,
 }

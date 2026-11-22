@@ -83,6 +83,16 @@ In the ComputerWrist the gamepad moves the hand, the jump button chooses an item
 
 No calibration is needed.  Even cheap gamepads that the computer doesn't know work fine.
 ^P
+{D}{H}TWO PLAYERS
+{B}
+Bring a friend! Turn on Two Players under Configure, Use Gamepad. In the levels a second Keen joins in: player 1 uses the gamepad, player 2 a second gamepad or the keyboard. Player 2 wears a blue helmet and a green shirt. On the world map he tags along behind player 1.
+
+The view follows player 1. If player 2 is lost off the screen, he is brought back. Keys, gems and lives are shared (you start with twice as many lives), shots you find go to both, but each Keen keeps his own score.
+^P
+{D}{H}TWO PLAYERS (cont'd.)
+{B}
+Careful where you aim: a stunner shot makes the other Keen dizzy for two seconds. When player 2 dies, he comes back next to player 1 for one of the lives. If there are none left, he waits for the next level.
+^P
 {D}{H}QUICK SAVE
 {B}
 Is that last jump giving you trouble? Press the gamepad's Save State button to save the game right where you are, and Load State brings you back there. You can also load the quick save from Load Game: press the down arrow key past the last game, and you will find it on the second page.

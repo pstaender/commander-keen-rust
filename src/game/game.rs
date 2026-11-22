@@ -14,6 +14,12 @@ impl Game {
         self.gs.nextextra = 20000;
         self.gs.lives = 3;
         self.gs.ammo = 5;
+        self.mp_new_game();
+        // two player mode (not in the original): the lives are shared, so
+        // twice as many
+        if self.mp_available() {
+            self.gs.lives *= 2;
+        }
     }
 
     /// GameOver (0x158ad)
@@ -108,6 +114,7 @@ impl Game {
         }
         self.rf_new_map();
         self.scan_info_plane();
+        self.mp_setup_level();
         if self.gs.mapon == 0 {
             self.scan_world_flags();
         }

@@ -173,7 +173,10 @@ impl Game {
         }
         self.set_moonok(0);
         self.invincible = 30;
-        self.scrolllock = true;
+        // (two player mode: the camera stays with player 1)
+        if !self.mp.swapped {
+            self.scrolllock = true;
+        }
         self.objs[p].needtoclip = CL_NOCLIP;
         self.objs[p].priority = 3;
         // Keen 4 (0x1c264): in the underwater level 17 Keen dies in his suit
@@ -235,7 +238,7 @@ impl Game {
         } else if kind == 10 {
             self.gs.lives += 1;
         } else if kind == 11 {
-            self.gs.ammo += AMMOBYDIFF[self.gs.difficulty.clamp(0, 3) as usize];
+            self.give_ammo(AMMOBYDIFF[self.gs.difficulty.clamp(0, 3) as usize]);
         }
         let n = self.get_new_obj(true);
         let o = &mut self.objs[n];
@@ -600,7 +603,12 @@ pub fn keen_enter_think(g: &mut Game, ob: usize) {
     let next = g.objs[ob].st().next.unwrap_or(&S_KEENSTAND);
     g.change_state(ob, next);
     g.objs[ob].needtoclip = CL_MIDCLIP;
-    g.center_actor(ob);
+    // two player mode: the camera stays with player 1, and player 2 comes
+    // along through player 1's doors
+    if !g.mp.swapped {
+        g.center_actor(ob);
+        g.mp_follow_door();
+    }
 }
 
 /// KeenSwitchThink (0x1aaf2)
@@ -1044,12 +1052,19 @@ pub fn keen_die_think(g: &mut Game, ob: usize) {
 
 /// KeenContact: what touching an object does, per episode (src/ckN/ep.rs).
 pub fn keen_contact(g: &mut Game, ob: usize, hit: usize) {
+    // two player mode: the other player's stunner shots
+    if g.mp_shot_hits_keen(ob, hit) {
+        return;
+    }
     super::ep::keen_contact(g, ob, hit);
 }
 
 /// KeenPosContact: while on a pole etc. landing on platform-like objects,
 /// per episode (src/ckN/ep.rs).
 pub fn keen_pos_contact(g: &mut Game, ob: usize, hit: usize) {
+    if g.mp_shot_hits_keen(ob, hit) {
+        return;
+    }
     super::ep::keen_pos_contact(g, ob, hit);
 }
 
