@@ -79,6 +79,11 @@ impl Game {
         self.opts.allow_reenter && self.demomode == 0
     }
 
+    /// Cheat option UNLIMITED LIVES (not in demos).
+    pub fn unlimited_lives(&self) -> bool {
+        self.opts.unlimited_lives && self.demomode == 0
+    }
+
     /// Cheat card: adds or removes the entries of finished levels on the
     /// world map currently loaded, after "ALLOW RE-ENTER" was toggled.
     pub fn update_reenter_entries(&mut self) {
@@ -168,7 +173,10 @@ impl Game {
         let name = LEVELNAMES.get(self.gs.mapon as usize).copied().unwrap_or("").to_string();
         let (_, h) = self.measure_multiline(&name);
         self.gs.keys = [0; 4];
-        self.gs.lives -= 1;
+        // (cheat option UNLIMITED LIVES: dying costs nothing)
+        if !self.unlimited_lives() {
+            self.gs.lives -= 1;
+        }
         if self.gs.lives < 0 {
             return;
         }

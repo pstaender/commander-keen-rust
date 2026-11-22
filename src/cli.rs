@@ -45,7 +45,8 @@ const USAGE: &str = "keenN [options]
                      recorded with F10+D (DEMOn.CKn), and exit
   --debug-shortcuts  enable the F10 debug keys (alias: --debug)
   --cheatmode        CHEAT OPTIONS instead of END GAME in the main menu
-                     (extra lives and shots, re-enter finished levels);
+                     (extra lives and shots, re-enter finished levels,
+                     unlimited lives);
                      F2/F3 quick save/load the slot last saved or loaded
   --dump DIR         export the original graphics as PNG files and exit
   --export-sfx DIR   write the original sound effects as DIR/NN-adlib.wav

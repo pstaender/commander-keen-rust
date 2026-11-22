@@ -20,6 +20,8 @@ pub struct Options {
     pub cheatmode: bool,
     /// cheat option: finished levels can be entered again
     pub allow_reenter: bool,
+    /// cheat option: dying costs no life
+    pub unlimited_lives: bool,
     /// --no-auto-save: no AUTOSAVE.CKn while playing / resume at start
     pub no_auto_save: bool,
     /// --classic: the game as it was; implies classic_view and

@@ -324,7 +324,9 @@ impl Game {
         self.remove_obj(n);
         self.mp.dizzy[1] = 0;
         self.mp.other.riding = None;
-        if self.gs.lives > 0 {
+        if self.unlimited_lives() {
+            self.mp.respawn = RESPAWNTICS;
+        } else if self.gs.lives > 0 {
             self.gs.lives -= 1;
             self.mp.respawn = RESPAWNTICS;
         } else {
@@ -530,6 +532,7 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use super::super::defs::*;
+    use super::super::states::*;
     use super::super::Game;
     use crate::assets::GameData;
     use crate::engine::{gfx::Gfx, sound::SoundManager, sys::Sys};
@@ -599,6 +602,30 @@ mod tests {
         g.mp.enabled = true;
         g.load_state();
         assert!(g.mp.p2.is_some());
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn unlimited_lives_cheat() {
+        let tmp = std::env::temp_dir().join(format!("keen-mp-lives-{}-{}", super::super::EPISODE, std::process::id()));
+        let _ = std::fs::create_dir_all(&tmp);
+        let Some(mut g) = two_player_game(&tmp) else { return };
+        // a new two player game starts with twice the lives
+        assert_eq!(g.gs.lives, 6);
+        g.opts.unlimited_lives = true;
+        g.mp_p2_died();
+        assert_eq!(g.gs.lives, 6);
+        assert!(g.mp.respawn > 0);
+        g.opts.unlimited_lives = false;
+        g.mp.respawn = 0;
+        g.mp_spawn_p2(&S_KEENSTAND);
+        g.mp_p2_died();
+        assert_eq!(g.gs.lives, 5);
+        // (HandleDeath uses the same rule for player 1; never in demos)
+        g.opts.unlimited_lives = true;
+        assert!(g.unlimited_lives());
+        g.demomode = 1;
+        assert!(!g.unlimited_lives());
         let _ = std::fs::remove_dir_all(&tmp);
     }
 
