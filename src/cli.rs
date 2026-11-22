@@ -24,8 +24,8 @@ const USAGE: &str = "keenN [options]
   --no-aspect        do not stretch to 4:3
   --classic          the game as it was: no widescreen, no MIDI music, no
                      volume settings, no autosave and no quick save
-                     (gamepad save/load state, load menu page 2,
-                     --cheatmode F2/F3)
+                     (gamepad save/load state, load menu page 2, F2/F3)
+                     and no extended options
   --classic-view     keep the original 320x200 play field (otherwise it
                      widens to the window's shape, e.g. 16:9)
   --system-shortcuts keep the macOS keyboard shortcuts (Ctrl+arrows switch
@@ -41,10 +41,6 @@ const USAGE: &str = "keenN [options]
   --demo N|FILE      play the original demo N (0-3), or a demo file
                      recorded with F10+D (DEMOn.CKn), and exit
   --debug-shortcuts  enable the F10 debug keys (alias: --debug)
-  --cheatmode        CHEAT OPTIONS instead of END GAME in the main menu
-                     (extra lives and shots, re-enter finished levels,
-                     unlimited lives);
-                     F2/F3 quick save/load the slot last saved or loaded
   --dump DIR         export the original graphics as PNG files and exit
   --export-sfx DIR   write the original sound effects as DIR/NN-adlib.wav
                      and DIR/NN-pc.wav and exit
@@ -92,7 +88,6 @@ pub fn main(default_dir: &str) {
             "--windowed" => opts.fullscreen = Some(false),
             "--classic-view" => opts.classic_view = true,
             "--classic" => opts.classic = true,
-            "--cheatmode" => opts.cheatmode = true,
             "--no-auto-save" => opts.no_auto_save = true,
             "--difficulty" => {
                 opts.start_difficulty = match next(&mut i).to_ascii_lowercase().as_str() {
@@ -126,6 +121,9 @@ pub fn main(default_dir: &str) {
         opts.classic_view = true;
         opts.no_auto_save = true;
     }
+    // extended mode (EXTENDED OPTIONS in the main menu, F2/F3 quick save/load,
+    // inventory box) is on unless --classic
+    opts.cheatmode = !opts.classic;
     let data = match GameData::load_with_maps(&data_dir, maps_dir.as_deref()) {
         Ok(d) => d,
         Err(e) => {

@@ -55,7 +55,7 @@ impl Game {
                     continue;
                 }
                 let kind = v >> 8;
-                // --cheatmode "ALLOW RE-ENTER": finished levels keep their entry
+                // extended option "ALLOW RE-ENTER": finished levels keep their entry
                 if kind == 0xc0 && self.reenter_allowed() {
                     continue;
                 }
@@ -74,17 +74,17 @@ impl Game {
         }
     }
 
-    /// The cheat option "ALLOW RE-ENTER" is on (never in demos).
+    /// The extended option "ALLOW RE-ENTER" is on (never in demos).
     fn reenter_allowed(&self) -> bool {
         self.opts.allow_reenter && self.demomode == 0
     }
 
-    /// Cheat option UNLIMITED LIVES (not in demos).
+    /// Extended option UNLIMITED LIVES (not in demos).
     pub fn unlimited_lives(&self) -> bool {
         self.opts.unlimited_lives && self.demomode == 0
     }
 
-    /// Cheat card: adds or removes the entries of finished levels on the
+    /// Extended options card: adds or removes the entries of finished levels on the
     /// world map currently loaded, after "ALLOW RE-ENTER" was toggled.
     pub fn update_reenter_entries(&mut self) {
         let Some(Some(m)) = self.data.maps.maps.get(self.ca_mapon as usize) else {
@@ -173,7 +173,7 @@ impl Game {
         let name = LEVELNAMES.get(self.gs.mapon as usize).copied().unwrap_or("").to_string();
         let (_, h) = self.measure_multiline(&name);
         self.gs.keys = [0; 4];
-        // (cheat option UNLIMITED LIVES: dying costs nothing)
+        // (extended option UNLIMITED LIVES: dying costs nothing)
         if !self.unlimited_lives() {
             self.gs.lives -= 1;
         }
@@ -320,7 +320,7 @@ impl Game {
                     }
                     let done = self.ca_mapon;
                     self.lastlevel = done;
-                    // cheat "ALLOW RE-ENTER": a member is only rescued once
+                    // extended option "ALLOW RE-ENTER": a member is only rescued once
                     if self.reenter_allowed() && self.gs.leveldone.get(done as usize).is_some_and(|&d| d != 0) {
                         self.gs.mapon = 0;
                         continue;

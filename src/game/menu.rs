@@ -105,8 +105,11 @@ const PADDLECARD: usize = 16;
 const GAMEPADCARD: usize = 17;
 /// Keen 5 only: the "FIX JERKY MOTION" option
 const JERKCARD: usize = 18;
-/// --cheatmode: the "CHEAT OPTIONS" card (replaces END GAME)
+/// extended mode: the "EXTENDED OPTIONS" card (replaces END GAME in the
+/// main menu and holds it as its last entry)
 const CHEATCARD: usize = 19;
+/// the END GAME entry of the extended options card
+const CHEAT_ENDGAME_ITEM: usize = 5;
 /// a gamepad is connected: "USE GAMEPAD" (replaces the joystick entries
 /// of the config card) and its movement / button binding cards
 const PADCARD: usize = 20;
@@ -122,7 +125,7 @@ const PAD_TWOPLAYERS_ITEM: usize = 3;
 /// the gamepad actions of the PADMOVECARD and PADBUTTONSCARD entries
 const PADMOVE_ACTIONS: [usize; 4] = [PAD_UP, PAD_DOWN, PAD_LEFT, PAD_RIGHT];
 const PADBUTTON_ACTIONS: [usize; 6] = [PAD_JUMP, PAD_POGO, PAD_FIRE, PAD_MENU, PAD_SAVESTATE, PAD_LOADSTATE];
-/// most lives / shots the cheat card adds (the score box shows two digits)
+/// most lives / shots the extended options card adds (the score box shows two digits)
 const CHEATMAX: i32 = 99;
 
 /// DS:0x4128 control type names
@@ -165,7 +168,7 @@ enum Custom {
     Jerk,
     /// Keen 5 gamepad card (never reachable: no gamepad support)
     Gamepad,
-    /// --cheatmode card (not in the original)
+    /// extended options card (not in the original)
     Cheat,
     /// gamepad card (not in the original)
     Pad,
@@ -346,7 +349,7 @@ fn build_cards() -> Vec<Card> {
         // Keen 5: GAMEPADCARD, JERKCARD
         card(0, 0, 0x15, Vec::new(), Custom::Gamepad, 0),
         card(0, 0, 0, Vec::new(), Custom::Jerk, 0),
-        // CHEATCARD (--cheatmode, not in the original)
+        // CHEATCARD (extended options, not in the original)
         card(
             8,
             0,
@@ -357,6 +360,7 @@ fn build_cards() -> Vec<Card> {
                 b(0x13, "ALLOW RE-ENTER", 0),
                 b(0x16, "UNLIMITED LIVES", 0),
                 b(0x17, "SHOW INVENTORY", 0),
+                b(0x12, "END GAME", 2),
             ],
             Custom::Cheat,
             0,
@@ -429,7 +433,7 @@ pub struct ModState {
     px: i32,
     py: i32,
     games: Vec<SaveSlot>,
-    /// --cheatmode quick save/load (F2/F3): the slot last loaded or saved
+    /// extended mode quick save/load (F2/F3): the slot last loaded or saved
     quickslot: Option<usize>,
     /// load card page: 0 = the six saved games, 1 = quick save and
     /// autosave (not in the original)
@@ -1434,7 +1438,7 @@ impl Game {
         self.sys.input.clear_keys_down();
     }
 
-    /// --cheatmode card: extra lives and shots, re-entering finished levels.
+    /// extended options card: extra lives and shots, re-entering finished levels.
     /// Sets the menu volumes on the sound manager (not with --classic).
     pub fn apply_volumes(&mut self) {
         let (s, m) = if self.opts.classic { (100, 100) } else { (self.menu.sfx_volume, self.menu.music_volume) };
@@ -1512,8 +1516,8 @@ impl Game {
     fn usl_cheat_custom(&mut self, call: i32, i: Option<usize>) -> bool {
         match call {
             UIC_SETUPCARD => {
-                // lives and shots only exist in a running game
-                for n in 0..2 {
+                // lives, shots and END GAME only exist in a running game
+                for n in [0, 1, CHEAT_ENDGAME_ITEM] {
                     let it = &mut self.menu.cards[CHEATCARD].items[n];
                     if self.menu.ingame {
                         it.flags &= !UI_DISABLED;
@@ -1524,7 +1528,7 @@ impl Game {
                 false
             }
             UIC_TOUCHUPCARD => {
-                self.usl_draw_text_title("CHEAT OPTIONS");
+                self.usl_draw_text_title("EXTENDED OPTIONS");
                 false
             }
             UIC_DRAW => {
@@ -1534,11 +1538,14 @@ impl Game {
                     1 => format!("ADD EXTRA SHOT [{}]", self.gs.ammo),
                     2 => format!("ALLOW RE-ENTER [{}]", if self.opts.allow_reenter { "X" } else { " " }),
                     3 => format!("UNLIMITED LIVES [{}]", if self.opts.unlimited_lives { "X" } else { " " }),
-                    _ => format!("SHOW INVENTORY [{}]", if self.opts.hide_inventory { " " } else { "X" }),
+                    4 => format!("SHOW INVENTORY [{}]", if self.opts.hide_inventory { " " } else { "X" }),
+                    _ => return false,
                 };
                 self.usl_draw_item_text(i, &text);
                 true
             }
+            // END GAME: the generic handling (UC_ABORT)
+            UIC_HIT if i == Some(CHEAT_ENDGAME_ITEM) => false,
             UIC_HIT => {
                 let i = i.unwrap_or(0);
                 match i {
@@ -2103,7 +2110,7 @@ impl Game {
     /// USL_UpLevel (0x2b1dd)
     fn usl_up_level(&mut self) {
         if self.menu.stack.len() == 1 {
-            // --cheatmode: in a game ESC returns to it (RETURN TO GAME)
+            // extended mode: in a game ESC returns to it (RETURN TO GAME)
             let comm = if self.opts.cheatmode && self.menu.ingame { 1 } else { UC_QUIT };
             self.usl_confirm_comm(comm);
             return;
@@ -2203,7 +2210,7 @@ impl Game {
         if self.menu.cards.is_empty() {
             self.menu.cards = build_cards();
             if self.opts.cheatmode {
-                self.menu.cards[ROOTCARD].items[5] = item(UII_FOLDER, 0, 0x23, "CHEAT OPTIONS", 0, Some(CHEATCARD));
+                self.menu.cards[ROOTCARD].items[5] = item(UII_FOLDER, 0, 0x23, "EXTENDED OPTIONS", 0, Some(CHEATCARD));
             }
             if self.opts.classic {
                 // --classic: no save / load state buttons, no volume
@@ -2813,7 +2820,7 @@ impl Game {
         Ok(())
     }
 
-    /// --cheatmode F2 (not in the original): saves to the slot last loaded
+    /// extended mode F2 (not in the original): saves to the slot last loaded
     /// or saved without asking. False if there is no such slot.
     pub fn quick_save(&mut self) -> bool {
         let Some(i) = self.menu.quickslot else { return false };
@@ -2825,7 +2832,7 @@ impl Game {
         true
     }
 
-    /// --cheatmode F3 (not in the original): loads the slot last loaded or
+    /// extended mode F3 (not in the original): loads the slot last loaded or
     /// saved without asking. False if there is no such slot.
     pub fn quick_load(&mut self) -> bool {
         let Some(i) = self.menu.quickslot else { return false };

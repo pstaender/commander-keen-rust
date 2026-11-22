@@ -123,7 +123,6 @@ Here are some new command line parameters:
   {K} --no-auto-save  (Don't save the game every five seconds.)
   {K} --level 3  (Jump right into level 3.)
   {K} --difficulty hard  (Use with --level: easy, normal or hard.)
-  {K} --cheatmode  (Cheat Options in the ComputerWrist.)
   {K} --maps DIR  (Play the levels you made with the Commander Keen Editor.)
 ^P
 {D}{H}COMMAND LINE PARAMETERS (cont'd.)

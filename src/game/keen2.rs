@@ -68,7 +68,7 @@ impl Game {
             return;
         }
         // the inventory (not in the original): bottom right, with
-        // --cheatmode only (on unless switched off with the cheat option
+        // extended mode only (on unless switched off with the extended option
         // SHOW INVENTORY), not with --classic
         if self.opts.cheatmode && !self.opts.hide_inventory && !self.opts.classic {
             self.draw_items_box();

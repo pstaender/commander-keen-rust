@@ -16,19 +16,20 @@ pub struct Options {
     pub fullscreen: Option<bool>,
     /// --classic-view: always the original 320 pixel wide play field
     pub classic_view: bool,
-    /// --cheatmode: CHEAT OPTIONS replaces END GAME in the control panel
+    /// extended mode (on unless --classic): EXTENDED OPTIONS replaces END
+    /// GAME in the control panel (END GAME moves into it), F2/F3 quick save/load, inventory box
     pub cheatmode: bool,
-    /// cheat option: finished levels can be entered again
+    /// extended option: finished levels can be entered again
     pub allow_reenter: bool,
-    /// cheat option: dying costs no life
+    /// extended option: dying costs no life
     pub unlimited_lives: bool,
-    /// cheat option SHOW INVENTORY off: no items box at the bottom right
-    /// (it is only shown with --cheatmode)
+    /// extended option SHOW INVENTORY off: no items box at the bottom right
+    /// (it is only shown in extended mode)
     pub hide_inventory: bool,
     /// --no-auto-save: no AUTOSAVE.CKn while playing / resume at start
     pub no_auto_save: bool,
     /// --classic: the game as it was; implies classic_view and
     /// no_auto_save, no quick save (gamepad save/load state, the load menu's
-    /// second page, --cheatmode F2/F3), no MIDI music and no volume bars
+    /// second page, F2/F3), no extended mode, no MIDI music and no volume bars
     pub classic: bool,
 }

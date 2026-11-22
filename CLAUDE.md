@@ -93,8 +93,8 @@ runtime and are never committed.
   map only a sprite following Keen 1's path (`mp_world_tick`,
   `RfState::extra`). Keen 2 is drawn 2 pixels higher (`ALTYOFFSET`)
   and behind Keen 1. A new game in two player mode starts with 6 lives.
-  With --cheatmode the inventory (gems, K5 keycard, K6 special items) is
-  shown at the bottom right, one and two players (`draw_items_box`, cheat
+  In extended mode the inventory (gems, K5 keycard, K6 special items) is
+  shown at the bottom right, one and two players (`draw_items_box`, extended
   option SHOW INVENTORY, on by default; on the world map only the K6
   special items). Player 1 = first pad, player 2 = second pad or keyboard
   (`Input::split`, `read_control_p2`). `Game::as_p2` swaps player 2's
@@ -109,7 +109,10 @@ runtime and are never committed.
 - `--classic` (`Options::classic`) switches the additions off: it implies
   `classic_view` and `no_auto_save`, hides MIDI MUSIC and the volume bars
   of the sound/music cards and disables
-  quick save (gamepad save/load state, load menu page 2, cheat F2/F3).
+  quick save (gamepad save/load state, load menu page 2, F2/F3)
+  and extended mode (`Options::cheatmode`, otherwise always on: EXTENDED
+  OPTIONS card in place of END GAME, which moves into that card, F2/F3,
+  inventory box).
   New non-original features should respect it.
 - Original globals live in `Game` (src/game/mod.rs); module-private globals
   go in the module's `ModState`.

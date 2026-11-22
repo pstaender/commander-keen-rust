@@ -711,7 +711,7 @@ impl Game {
             }
             self.rf_force_refresh();
         }
-        // --cheatmode: F2 quick saves, F3 quick loads the last used slot
+        // extended mode: F2 quick saves, F3 quick loads the last used slot
         // (only once a game was loaded or saved, otherwise the panel opens)
         let ls = self.sys.input.last_scan;
         if self.opts.cheatmode && !self.opts.classic && !self.storedemo && (ls == SC_F2 || ls == SC_F3) {

@@ -28,7 +28,7 @@ Play in widescreen mode:
 
 <img width="1840" height="864" alt="widescreen" src="https://github.com/user-attachments/assets/7a850433-dee2-4e36-bdd2-6334ec218613" />
 
-Adding additional lives and armor and replay completed levels using the `--cheatmode`-flag:
+Adding additional lives and armor and replay completed levels with the extended options (EXTENDED OPTIONS in the main menu, which also holds END GAME; off with `--classic`):
 
 <img width="1072" height="864" alt="cheat_options" src="https://github.com/user-attachments/assets/ac6dac4f-fc06-4eba-93f7-c414dfdfd283" />
 
@@ -75,7 +75,7 @@ case-insensitively.
 | `--window-scale N` | window size multiplier (default 3) |
 | `--fullscreen` / `--windowed` | start fullscreen or in a window (otherwise the last used mode from `config.txt`) |
 | `--no-aspect` | don't stretch 320×200 to 4:3 |
-| `--classic` | the game as it was: no widescreen (play field, intro, menu), no MIDI music, no volume settings, no autosave and no quick save (gamepad save/load state, load menu page 2, `--cheatmode` F2/F3) |
+| `--classic` | the game as it was: no widescreen (play field, intro, menu), no MIDI music, no volume settings, no autosave and no quick save (gamepad save/load state, load menu page 2, F2/F3), no extended options |
 | `--classic-view` | keep the original 320×200 play field instead of widening it to the screen |
 | `--no-auto-save` | turn off the autosave (every 5 s to `saves/AUTOSAVE.CKn`; after a crash, kill or quit the game offers to resume it at the next start) |
 | `--system-shortcuts` | macOS: keep the system keyboard shortcuts active while the game has focus (see below) |
@@ -85,7 +85,6 @@ case-insensitively.
 | `--maps DIR` | load `GAMEMAPS.CKn` (and `MAPHEAD.CKn`) from DIR, e.g. levels made with the Commander Keen Editor |
 | `--demo N\|FILE` | play the original demo N (0–3, 4 = high score screen), or a demo file recorded with F10+D, and exit |
 | `--debug-shortcuts` | enable the F10 debug keys (alias `--debug`) |
-| `--cheatmode` | CHEAT OPTIONS replaces END GAME in the main menu: add lives and shots, allow re-entering finished levels, unlimited lives, show inventory |
 | `--dump DIR` | export all original graphics as PNG files and exit |
 | `--export-sfx DIR` | export all original sound effects as `DIR/NN-adlib.wav` and `DIR/NN-pc.wav` and exit (e.g. to compare with an audio pack) |
 | `--headless` | run without a window (automated testing) |
@@ -165,8 +164,8 @@ does not react, `KEEN_PAD_DEBUG=1` prints what it sends.
 - **Load menu:** the second page of LOAD GAME has the quick save and the
   autosave. Go down past the last slot or up past the first one (or press
   left/right) to turn the page.
-- With `--cheatmode`, F2 saves to and F3 loads the slot last saved or
-  loaded, without asking.
+- F2 saves to and F3 loads the slot last saved or loaded, without asking
+  (not with `--classic`).
 - Settings (sound mode, key bindings, gamepad, fullscreen) and high scores are stored in
   `config.txt` in the data directory, so each episode has its own.
 
