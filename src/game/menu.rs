@@ -2902,9 +2902,13 @@ impl Game {
     }
 
     /// extended mode F2 (not in the original): saves to the slot last loaded
-    /// or saved without asking. False if there is no such slot.
+    /// or saved without asking; without such a slot to the quick save (the
+    /// gamepad SAVE STATE file). False if there is no game to save.
     pub fn quick_save(&mut self) -> bool {
-        let Some(i) = self.menu.quickslot else { return false };
+        let Some(i) = self.menu.quickslot else {
+            self.save_state();
+            return true;
+        };
         let r = self.save_game_file(i);
         if r.is_ok() {
             self.menu.dirty = false;
@@ -2914,9 +2918,13 @@ impl Game {
     }
 
     /// extended mode F3 (not in the original): loads the slot last loaded or
-    /// saved without asking. False if there is no such slot.
+    /// saved without asking; without such a slot the quick save (the
+    /// gamepad LOAD STATE file).
     pub fn quick_load(&mut self) -> bool {
-        let Some(i) = self.menu.quickslot else { return false };
+        let Some(i) = self.menu.quickslot else {
+            self.load_state();
+            return true;
+        };
         let r = self.load_game_file(i);
         if r.is_ok() {
             // load_game_file centered the camera on Keen: show the new spot

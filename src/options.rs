@@ -30,8 +30,10 @@ pub struct Options {
     /// extended option SHOW INVENTORY off: no items box at the bottom right
     /// (it is only shown in extended mode; config.txt `showinventory`)
     pub hide_inventory: bool,
-    /// extended option ZOOM: the play field zoomed out to 75 or 50 percent
-    /// (0 = 100, the original size; config.txt `zoom`, `+`/`-` keys)
+    /// extended option ZOOM: the play field zoomed out to 75 (the default,
+    /// set in cli.rs) or 50 percent, 100 = the original size (config.txt
+    /// `zoom`, `+`/`-` keys; 75 for one player, 50 for more when the number
+    /// of players changes, `mp_zoom_for_players`; always 100 with --classic)
     pub zoom: u8,
     /// --zoom N given (and not changed in the game since): config.txt's
     /// zoom is neither used nor overwritten

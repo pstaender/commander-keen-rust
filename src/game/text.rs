@@ -73,7 +73,7 @@ Press F11 (or Cmd+F on a Mac, Win+F on Windows) to switch between a window and f
 ^P
 {D}{H}ZOOM
 {B}
-Want to see even more? Press the minus key while you play to zoom out to 75 or 50 percent, and the plus key to zoom back in. Everything gets smaller, but you can see much more of the level above, below and around Keen. That is handy in multiplayer mode.
+Keen shows you the level at 75 percent, so you see more of it. With two or more players it zooms out to 50 percent, with one player back to 75. Press the minus key while you play to zoom out, and the plus key to zoom in, up to the original 100 percent.
 
 You can also change Zoom under Extended Options. Keen remembers your choice.
 ^P
@@ -118,7 +118,7 @@ The inventory at the bottom right shows the gems and other items you are carryin
 {B}
 Is that last jump giving you trouble? Press the gamepad's Save State button to save the game right where you are, and Load State brings you back there. You can also load the quick save from Load Game: press the down arrow key past the last game, and you will find it on the second page.
 
-F2 saves the game in the slot you used last, and F3 loads it again, without any questions.
+F2 saves the game in the slot you used last, and F3 loads it again, without any questions. If you haven't saved or loaded a game yet, F2 and F3 use the quick save.
 ^P
 {D}{H}AUTOSAVE
 {B}

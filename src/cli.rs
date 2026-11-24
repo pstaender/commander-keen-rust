@@ -23,7 +23,7 @@ const USAGE: &str = "keenN [options]
   --window-scale N   window size multiplier (default 3)
   --no-fullscreen    start in a window (default: fullscreen; F11 or
                      Cmd/Win+F toggles)
-  --zoom PERCENT     play field zoom: 100 (default), 75 or 50 shows more
+  --zoom PERCENT     play field zoom: 100, 75 (default) or 50 shows more
                      of the level (extended option ZOOM, - and + keys)
   --no-aspect        do not stretch to 4:3
   --classic          the game as it was: no widescreen, no MIDI music, no
@@ -69,7 +69,8 @@ pub fn main(default_dir: &str) {
     let mut maps_dir: Option<PathBuf> = None;
     let mut headless = false;
     let mut fullscreen = true;
-    let mut opts = Options::default();
+    // extended option ZOOM: 75 percent unless config.txt or --zoom say otherwise
+    let mut opts = Options { zoom: 75, zoom_config: 75, ..Options::default() };
     let mut i = 1;
     let next = |i: &mut usize| -> String {
         *i += 1;

@@ -161,7 +161,22 @@ impl Game {
     /// gamepads allow, then 1 again.
     pub fn mp_next_players(&mut self) {
         let max = self.mp_max_players();
+        let before = self.mp.players;
         self.mp.players = if self.mp.players >= max { 1 } else { (self.mp.players + 1).max(2) };
+        if self.mp.players != before {
+            self.mp_zoom_for_players();
+        }
+    }
+
+    /// The number of players changed: the zoom follows it, 75 percent for
+    /// one player, 50 for two or more (it can still be changed afterwards;
+    /// not with --classic, which keeps 100).
+    pub fn mp_zoom_for_players(&mut self) {
+        if self.opts.classic {
+            return;
+        }
+        self.opts.zoom = if self.mp.players >= 2 { 50 } else { 75 };
+        self.opts.zoom_given = false;
     }
 
     /// Multiplayer: the controls are split between the players (each his
@@ -238,6 +253,7 @@ impl Game {
     pub fn mp_auto_enable(&mut self) {
         if std::mem::take(&mut self.sys.input.two_pads_at_start) && !self.opts.classic && !self.mp.enabled() {
             self.mp.players = 2;
+            self.mp_zoom_for_players();
         }
     }
 
@@ -1077,6 +1093,23 @@ mod tests {
         g.sys.input.pad_count = 2;
         g.mp.players = 4;
         assert_eq!(g.mp_count(), 3);
+        // the zoom follows the number of players: 50 for two or more, 75
+        // for one; changed by hand it stays until the number changes
+        g.mp.players = 1;
+        g.opts.zoom = 100;
+        g.mp_next_players();
+        assert_eq!((g.mp.players, g.zoom()), (2, 50));
+        g.step_zoom(false);
+        assert_eq!(g.zoom(), 75);
+        g.mp_next_players();
+        assert_eq!((g.mp.players, g.zoom()), (3, 50));
+        g.mp_next_players();
+        assert_eq!((g.mp.players, g.zoom()), (1, 75));
+        // --classic: always 100
+        g.opts.classic = true;
+        g.mp.players = 2;
+        g.mp_zoom_for_players();
+        assert_eq!(g.zoom(), 100);
         let _ = std::fs::remove_dir_all(&tmp);
     }
 

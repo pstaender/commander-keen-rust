@@ -89,7 +89,7 @@ case-insensitively.
 | `--no-aspect` | don't stretch 320×200 to 4:3 |
 | `--classic` | the game as it was: no widescreen (play field, intro, menu), no MIDI music, no volume settings, no autosave and no quick save (gamepad save/load state, load menu page 2, F2/F3), no extended options |
 | `--classic-view` | keep the original 320×200 play field instead of widening it to the screen (and no zoom) |
-| `--zoom PERCENT` | play field zoom: `100` (default), `75` or `50` (see [Zoom](#zoom)) |
+| `--zoom PERCENT` | play field zoom: `100`, `75` (default) or `50` (see [Zoom](#zoom)) |
 | `--no-auto-save` | turn off the autosave (every 5 s to `saves/AUTOSAVE.CKn`; after a crash, kill or quit the game offers to resume it at the next start) |
 | `--system-shortcuts` | macOS: keep the system keyboard shortcuts active while the game has focus (see below) |
 | `--nosound` | disable audio output |
@@ -111,7 +111,7 @@ The defaults are the original ones and can be changed in the in-game menu
 |---|---|
 | Arrow keys (Home/PgUp/End/PgDn for diagonals) | move, look up/down, enter doors |
 | Enter | status window |
-| Esc / F2–F7 | control panel (new game, load/save, options, …); in Keen 6 also F1 |
+| Esc / F4–F7 | control panel (new game, load/save, options, …); in Keen 6 also F1, with `--classic` also F2/F3 |
 | F1 (Keen 4/5) | help screens; move the hand up onto the HELP! title and press Enter for a help section about everything new in this version (not with `--classic`) |
 | `-` / `+` | zoom the play field out / in (100, 75, 50 %; not with `--classic`) |
 | Pause | pause |
@@ -207,8 +207,9 @@ one without a gamepad with the keyboard:
 - **Load menu:** the second page of LOAD GAME has the quick save and the
   autosave. Go down past the last slot or up past the first one (or press
   left/right) to turn the page.
-- F2 saves to and F3 loads the slot last saved or loaded, without asking
-  (not with `--classic`).
+- F2 saves to and F3 loads the slot last saved or loaded, without asking;
+  before a slot was used they save / load the quick save (the gamepad's
+  SAVE STATE) (not with `--classic`).
 - Settings (sound mode, key bindings, gamepad) and high scores are stored in
   `config.txt` in the data directory, so each episode has its own.
 
@@ -239,10 +240,11 @@ immediately.
 
 ## Zoom
 
-The play field can be zoomed out to 75 or 50 percent, which shows more of
-the level in every direction (at 50 % on a 16:9 screen about 852×400 pixels
-instead of 426×200). This helps especially in multiplayer mode. Press `-`
-and `+` while playing, or change ZOOM in EXTENDED OPTIONS; the setting is
+The play field is zoomed out to 75 % by default, which shows more of the
+level in every direction (at 50 % on a 16:9 screen about 852×400 pixels
+instead of 426×200). Changing the number of players sets the zoom to 50 %
+for two or more players and back to 75 % for one. Press `-` and `+` while
+playing, or change ZOOM in EXTENDED OPTIONS (100, 75, 50 %); the setting is
 remembered in `config.txt`. `--zoom 50` sets it for one session only.
 
 - It works like the widescreen view in both directions: enemies wake up
