@@ -8,3 +8,10 @@
   (`high_scores_shown`) no longer replays demo 4: `high_scores_still`
   removes all sprites and only animates the map until a key/button
   (stays forever). The demo loop's high score demo is unchanged.
+
+## Loaded games keep the info plane's scroll blocks
+- LoadTheGame only calls RF_NewMap, which keeps just the map-edge blocks;
+  the info plane's scroll blocks (25/26) were lost, so a zoomed out view
+  of a loaded game showed what lies beyond them (Keen 6 world map, row
+  69). `restore_scroll_blocks` re-adds them after loading (not with
+  --classic).

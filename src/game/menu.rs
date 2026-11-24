@@ -3184,12 +3184,31 @@ impl Game {
         }
         self.mp_after_load(objs);
         self.rf_new_map();
+        // (not in the original, which loses them: a zoomed out view would
+        // show what lies beyond them, e.g. on Keen 6's world map)
+        if !self.opts.classic {
+            self.restore_scroll_blocks();
+        }
         self.rf_mark_tile_graphics_public();
         let p = self.player;
         self.center_actor(p);
         self.loadedgame = true;
         self.playstate = EX_LOADEDGAME;
         Ok(())
+    }
+
+    /// The scroll blocks of the info plane, as ScanInfoPlane sets them
+    /// (Keen 5 has only horizontal ones), for a loaded game.
+    fn restore_scroll_blocks(&mut self) {
+        for y in 0..self.mapheight {
+            for x in 0..self.mapwidth {
+                match self.map_tile(2, x, y) {
+                    25 => self.rf_set_scroll_block(x, y, true),
+                    26 if super::EPISODE != 5 => self.rf_set_scroll_block(x, y, false),
+                    _ => {}
+                }
+            }
+        }
     }
 
     /// extended mode F2 (not in the original): saves to the slot last loaded
