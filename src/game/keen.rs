@@ -184,7 +184,6 @@ impl Game {
             return;
         }
         self.set_moonok(0);
-        self.battle_died();
         self.invincible = 30;
         // (multiplayer mode: the camera stays with the leading Keen)
         if self.mp.cur == 0 {

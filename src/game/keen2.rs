@@ -187,10 +187,20 @@ impl Game {
         // empty with the extended options UNLIMITED AMMO / LIVES.
         let a = if self.unlimited_ammo() { String::new() } else if ammo < 100 { ammo.to_string() } else { "99".into() };
         self.draw_score_digits(&a, 2, base_x + 64, base_y + 20);
-        // (battle mode: the deaths instead of the lives)
-        let l = if self.battle_on() {
-            self.battle.deaths[n].min(99).to_string()
-        } else if self.unlimited_lives() {
+        // battle mode: how often he was knocked out, 0, -1, -2, ...
+        if self.battle_on() {
+            let k = self.battle.knocked[n].min(99);
+            self.draw_score_digits(&k.to_string(), 2, base_x + 24, base_y + 20);
+            if k > 0 {
+                // the minus: the middle segment of a digit in its red, in
+                // the left digit (or just before the field from -10 on)
+                let x = if k < 10 { base_x + 24 + 1 } else { base_x + 24 - 4 };
+                let w = if k < 10 { 5 } else { 3 };
+                self.sys.surface.bar(x, base_y + 20 + 3, w, 1, 12);
+            }
+            return;
+        }
+        let l = if self.unlimited_lives() {
             String::new()
         } else if self.gs.lives < 100 {
             self.gs.lives.to_string()

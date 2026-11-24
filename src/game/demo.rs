@@ -1591,8 +1591,8 @@ impl Game {
     }
 
     /// Battle mode: the results in place of the high score table, one line
-    /// per Keen, the best first: his helmet in his colors, his strikes and
-    /// his score.
+    /// per Keen, the best first: his helmet in his colors, how often he was
+    /// knocked out and his score.
     fn draw_battle_results(&mut self, rows: &[super::battle::BattleResult], dx: i32, dy: i32) {
         if super::EPISODE == 5 {
             self.tw.fontcolor = HS_COLOR;
@@ -1603,7 +1603,7 @@ impl Game {
             if let Some(t) = self.battle_helmet(r.person) {
                 self.sys.surface.blit(&t, x, y - 1);
             }
-            let text = if r.strikes == 1 { "1 strike".to_string() } else { format!("{} strikes", r.strikes) };
+            let text = format!("{}x knocked out", r.knocked);
             self.tw.printy = y;
             self.tw.printx = x + 18;
             self.us_print(&text);

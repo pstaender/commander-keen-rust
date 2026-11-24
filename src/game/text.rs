@@ -104,7 +104,7 @@ Keys, gems and lives are shared (you start with three lives for each player), sh
 {D}{H}MULTIPLAYER (cont'd.)
 {B}
 
-Careful where you aim: a stunner shot makes another Keen dizzy for two seconds. He falls off his pogo stick, sits down and sees stars.
+Careful where you aim: a stunner shot makes another Keen dizzy for two seconds. He falls off his pogo stick, sits down and sees stars. Hit the leading Keen, and the view follows you.
 
 When the leading Keen dies, the next one plays on, and the view follows him. The fallen Keen comes back for one of the lives. If there are none left, he waits for the next level.
 ^P
@@ -116,9 +116,9 @@ Collect items and stun monsters for points. Items come back after ten seconds. O
 ^P
 {D}{H}BATTLE (cont'd.)
 {B}
-Nobody can leave the level, not even through a door. A shot at another Keen is a strike. It makes him dizzy, and if the screen was following him, it follows you now.
+Nobody can leave the level, not even through a door. A shot at another Keen knocks him out for a moment, and if the screen was following him, it follows you now.
 
-The score boxes count how often each Keen died, and the clock at the top shows the time left. When it runs out, the high score screen shows everybody's strikes and score.
+The score boxes count how often each Keen was knocked out (0, -1, -2...), and the clock at the top shows the time left. When it runs out, the high score screen shows everybody's knock-outs and score.
 ^P
 {D}{H}EXTENDED OPTIONS
 {B}

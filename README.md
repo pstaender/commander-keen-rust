@@ -185,7 +185,9 @@ one without a gamepad with the keyboard:
   Keen comes back for one of the shared lives (a new game starts with three
   lives per player).
 - Keys, gems and lives are shared, shots found go to everybody, each Keen
-  keeps his own score. A stunner shot makes another Keen dizzy.
+  keeps his own score. A stunner shot makes another Keen dizzy; when it
+  hits the leading Keen, the one who fired takes the lead (the view
+  follows him).
 - On the world map only the leading player walks; the others follow him.
 - Changing the number in the middle of a level applies at once. Not in
   demos and not with `--classic`.
@@ -202,14 +204,16 @@ default, left / right).
   taken) and for stunning monsters (200). Shots found are only yours.
 - **Easy:** no monsters. **Normal:** monsters you stun stay stunned.
   **Hard:** stunned monsters wake up again after 5 seconds.
-- **Strikes:** a stunner shot that hits another Keen makes him dizzy; if
+- **Knock-outs:** a stunner shot that hits another Keen makes him dizzy;
+  his score box counts it where the lives are shown (0, -1, -2, ...).
+  While he is dizzy, more hits don't count. If
   the screen was following him, it follows the one who fired now.
 - Nobody leaves the level: doors and exits are closed, the objects that
-  would end the level are gone. A Keen who dies comes back at once; his
-  score box counts the deaths where the lives are shown.
+  would end the level are gone. A Keen who dies comes back at once.
 - The time left is shown at the top (MM:SS, the last 10 seconds blink).
-  When it is up, the high score screen shows the results: each Keen's
-  helmet in his colors, his strikes and his score, the best first.
+- When the time is up, the high score screen shows the results: each
+  Keen's helmet in his colors, how often he was knocked out ("3x knocked
+  out") and his score, the best first.
 - Always played at 50 % zoom, can't be saved. Not with `--classic`.
 
 ### Saves and settings

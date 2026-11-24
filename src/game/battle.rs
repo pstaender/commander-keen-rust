@@ -8,13 +8,13 @@
 //! - easy: no monsters; normal: the monsters stay stunned like in the
 //!   game; hard: they wake up again after 5 seconds,
 //! - nobody can leave the level (doors, exits and the objects that end a
-//!   level are blocked or removed), a Keen who dies comes back at once
-//!   (the score box counts the deaths where it shows the lives),
-//! - a stunner shot that hits another Keen is a strike; when it hits the
-//!   leading Keen (the camera's), the one who fired takes the lead,
-//! - the time left is shown at the top (MM:SS); when it runs out the
-//!   results are shown on the high score screen: each Keen's helmet in
-//!   his colors, his strikes and his score.
+//!   level are blocked or removed), a Keen who dies comes back at once,
+//! - a stunner shot that hits another Keen knocks him out (dizzy); his
+//!   score box counts it (0, -1, -2, ... where it shows the lives),
+//! - the time left is shown at the top (MM:SS); when it runs
+//!   out the results are shown on the high score
+//!   screen: each Keen's helmet in his colors, how often he was knocked
+//!   out and his score.
 //!
 //! Always played at 50 % zoom; no saving, no autosave. Never in demos or
 //! with --classic.
@@ -52,7 +52,8 @@ pub struct BattleResult {
     /// the player (0 = player 1)
     pub person: usize,
     pub score: i32,
-    pub strikes: i32,
+    /// how often he was knocked out by another Keen's shot
+    pub knocked: i32,
 }
 
 #[derive(Clone)]
@@ -69,9 +70,9 @@ pub struct BattleState {
     pub minutes: i32,
     /// tics left
     pub time_left: i32,
-    /// per player (0 = player 1): strikes on other Keens, deaths
-    pub strikes: [i32; MAXPLAYERS],
-    pub deaths: [i32; MAXPLAYERS],
+    /// per player (0 = player 1): how often another Keen's shot knocked
+    /// him out
+    pub knocked: [i32; MAXPLAYERS],
     /// where the leading Keen started (he comes back there)
     start: (i32, i32),
     /// taken items: (tics until they come back, item)
@@ -80,8 +81,6 @@ pub struct BattleState {
     monsters: Vec<Option<Obj>>,
     /// hard: stunned monsters (object, tics until they wake up)
     stunned: Vec<(usize, i32)>,
-    /// a stunner shot hit the leading Keen: the slot that fired takes the lead
-    lead_to: Option<usize>,
     /// the battle ended with the time up: the results, best first (the
     /// high score screen shows them instead of the high scores)
     pub results: Option<Vec<BattleResult>>,
@@ -97,13 +96,11 @@ impl Default for BattleState {
             level: 0,
             minutes: 5,
             time_left: 0,
-            strikes: [0; MAXPLAYERS],
-            deaths: [0; MAXPLAYERS],
+            knocked: [0; MAXPLAYERS],
             start: (0, 0),
             items: Vec::new(),
             monsters: Vec::new(),
             stunned: Vec::new(),
-            lead_to: None,
             results: None,
         }
     }
@@ -150,8 +147,7 @@ impl Game {
         }
         let b = &mut self.battle;
         b.active = true;
-        b.strikes = [0; MAXPLAYERS];
-        b.deaths = [0; MAXPLAYERS];
+        b.knocked = [0; MAXPLAYERS];
         b.results = None;
         b.time_left = b.minutes.clamp(1, MAXMINUTES) * 60 * 70;
         let level = if levels.contains(&b.level) {
@@ -171,7 +167,6 @@ impl Game {
         self.battle.items.clear();
         self.battle.stunned.clear();
         self.battle.monsters.clear();
-        self.battle.lead_to = None;
     }
 
     /// Objects that are monsters (removed in an easy battle): everything
@@ -195,7 +190,6 @@ impl Game {
         let hard = self.gs.difficulty == GD_HARD;
         self.battle.items.clear();
         self.battle.stunned.clear();
-        self.battle.lead_to = None;
         self.battle.monsters = vec![None; self.objs.len()];
         let p = self.player;
         self.battle.start = (self.objs[p].x, self.objs[p].y);
@@ -218,9 +212,6 @@ impl Game {
             return;
         }
         let tics = self.tics;
-        if let Some(k) = self.battle.lead_to.take() {
-            self.battle_take_lead(k);
-        }
         // items
         let mut back = Vec::new();
         self.battle.items.retain_mut(|(t, it)| {
@@ -319,18 +310,6 @@ impl Game {
         self.center_actor(p);
     }
 
-    /// The slot `k` (the Keen who fired at the leading one) takes the lead.
-    fn battle_take_lead(&mut self, k: usize) {
-        if self.mp.cur != 0 || k == 0 || self.keen_dying() {
-            return;
-        }
-        let Some(o) = self.mp.slots[k].obj else { return };
-        if self.keen_obj_dying(o) || self.objs[o].obclass != KEENOBJ {
-            return;
-        }
-        self.mp_battle_lead_to(k);
-    }
-
     /// A bonus object was taken (KeenContact; `o` as it was before): it
     /// comes back later.
     pub fn battle_bonus_taken(&mut self, o: Obj) {
@@ -408,25 +387,14 @@ impl Game {
         }
     }
 
-    /// A stunner shot of player `shooter` (0 = player 1) hit the Keen of
-    /// slot `k`: a strike; when he leads, the one who fired takes the lead.
-    pub fn battle_strike(&mut self, shooter: usize, k: usize) {
+    /// Another Keen's stunner shot hit the Keen of slot `k`: he is knocked
+    /// out once more.
+    pub fn battle_strike(&mut self, k: usize) {
         if !self.battle_on() {
             return;
         }
-        if let Some(s) = self.battle.strikes.get_mut(shooter) {
-            *s += 1;
-        }
-        if k == 0 {
-            self.battle.lead_to = self.mp.person.iter().position(|&p| p == shooter).filter(|&s| s != 0);
-        }
-    }
-
-    /// KillKeen: the current Keen died once more.
-    pub fn battle_died(&mut self) {
-        if self.battle_on() {
-            let n = self.mp.person[self.mp.cur];
-            self.battle.deaths[n] += 1;
+        if let Some(n) = self.battle.knocked.get_mut(self.mp.person[k]) {
+            *n += 1;
         }
     }
 
@@ -437,10 +405,10 @@ impl Game {
             .map(|p| BattleResult {
                 person: p,
                 score: self.mp_status(p).map_or(0, |s| s.0),
-                strikes: self.battle.strikes[p],
+                knocked: self.battle.knocked[p],
             })
             .collect();
-        r.sort_by(|a, b| b.score.cmp(&a.score).then(b.strikes.cmp(&a.strikes)).then(a.person.cmp(&b.person)));
+        r.sort_by(|a, b| b.score.cmp(&a.score).then(a.knocked.cmp(&b.knocked)).then(a.person.cmp(&b.person)));
         // "Time's up!"
         self.draw_playfield();
         self.us_center_window(16, 3);
@@ -598,11 +566,11 @@ mod tests {
         let _ = std::fs::remove_dir_all(&tmp);
     }
 
-    /// A shot of player 2 hits the leading Keen: a strike, player 2 takes
-    /// the lead (the camera); deaths are counted, the leading Keen comes
-    /// back where he started when nobody else is alive.
+    /// A shot of player 2 hits the leading Keen: player 1 is knocked out,
+    /// player 2 takes the lead (the camera); the leading Keen comes back
+    /// where he started when he dies with nobody else alive.
     #[test]
-    fn strikes_lead_and_deaths() {
+    fn knocked_out_lead_and_coming_back() {
         let tmp = tmpdir("strike");
         let Some(mut g) = battle(&tmp, 2, GD_NORMAL) else { return };
         let start = (g.objs[g.player].x, g.objs[g.player].y);
@@ -612,16 +580,27 @@ mod tests {
         g.objs[shot].owner = 2;
         let p1 = g.player;
         assert!(g.mp_shot_hits_keen(p1, shot));
-        assert_eq!(g.battle.strikes, [0, 1, 0, 0]);
+        assert_eq!(g.battle.knocked, [1, 0, 0, 0]);
         g.tics = 1;
-        g.battle_tick();
+        g.mp_tick();
         assert_eq!(g.mp.person, [1, 0, 2, 3]);
         // player 1 (now slot 1) is the dizzy one
         assert!(g.mp.dizzy[1] > 0 && g.mp.dizzy[0] == 0);
+        // hit again while he is dizzy: that doesn't count (and he keeps
+        // the lead he took)
+        let p1obj = g.mp.slots[1].obj.unwrap();
+        let shot2 = g.get_new_obj(false);
+        g.objs[shot2].obclass = STUNSHOTOBJ;
+        g.objs[shot2].state = Some(&super::super::states::S_STUNRAY1);
+        g.objs[shot2].owner = 2;
+        g.mp_contact(super::super::keen::keen_contact, p1obj, shot2);
+        assert_eq!(g.battle.knocked, [1, 0, 0, 0]);
+        assert_ne!(g.objs[shot2].obclass, STUNSHOTOBJ);
+        g.mp_tick();
+        assert_eq!(g.mp.person, [1, 0, 2, 3]);
         // the leading Keen (player 2) dies
         g.invincible = 0;
         g.kill_keen();
-        assert_eq!(g.battle.deaths, [0, 1, 0, 0]);
         // shots found are only his
         let a = g.mp.slots[1].vars.ammo;
         g.give_ammo(5);
