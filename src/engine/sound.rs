@@ -13,7 +13,7 @@
 
 use crate::assets::audio::{AdlibSound, Audio, PcSound, Song};
 use oplon::Opl2;
-use rodio::{OutputStream, OutputStreamBuilder, Sink, Source};
+use rodio::{OutputStreamBuilder, Sink, Source};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -400,9 +400,51 @@ impl Source for MidiSource {
     }
 }
 
+/// how long the audio output may take to start before the game goes on
+/// without sound
+const AUDIO_OPEN_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// The audio output, opened and kept on a thread of its own: a device that
+/// never finishes starting (CoreAudio waiting for an HDMI screen's audio,
+/// e.g.) only costs the sound, not the game. Dropping it closes the output.
+struct AudioOutput {
+    mixer: rodio::mixer::Mixer,
+    _stop: std::sync::mpsc::Sender<()>,
+}
+
+impl AudioOutput {
+    fn open() -> Result<AudioOutput, String> {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let (stop_tx, stop_rx) = std::sync::mpsc::channel::<()>();
+        std::thread::Builder::new()
+            .name("audio output".into())
+            .spawn(move || match OutputStreamBuilder::open_default_stream() {
+                Ok(mut stream) => {
+                    stream.log_on_drop(false);
+                    if tx.send(Ok(stream.mixer().clone())).is_ok() {
+                        // (keeps the stream until the sender is dropped)
+                        let _ = stop_rx.recv();
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            })
+            .map_err(|e| e.to_string())?;
+        match rx.recv_timeout(AUDIO_OPEN_TIMEOUT) {
+            Ok(Ok(mixer)) => Ok(AudioOutput { mixer, _stop: stop_tx }),
+            Ok(Err(e)) => Err(e),
+            Err(_) => Err(format!(
+                "the audio output did not start within {} seconds (check the sound output device)",
+                AUDIO_OPEN_TIMEOUT.as_secs()
+            )),
+        }
+    }
+}
+
 pub struct SoundManager {
     synth: Option<Arc<Mutex<Synth>>>,
-    _stream: Option<OutputStream>,
+    output: Option<AudioOutput>,
     sfx_sink: Option<Sink>,
     music_sink: Option<Sink>,
     pack: AudioPack,
@@ -522,7 +564,7 @@ impl SoundManager {
         let pack = AudioPack { dir: pack_dir.map(|p| p.to_path_buf()), soundfont: soundfont.map(|p| p.to_path_buf()), episode: None };
         let mut sm = SoundManager {
             synth: None,
-            _stream: None,
+            output: None,
             sfx_sink: None,
             music_sink: None,
             pack,
@@ -546,13 +588,12 @@ impl SoundManager {
         };
         let synth = Arc::new(Mutex::new(Synth::new(audio)));
         if enable {
-            match OutputStreamBuilder::open_default_stream() {
-                Ok(mut stream) => {
-                    stream.log_on_drop(false);
-                    stream.mixer().add(SynthSource { synth: synth.clone(), buf: Vec::new(), pos: 0 });
-                    sm.sfx_sink = Some(Sink::connect_new(stream.mixer()));
-                    sm.music_sink = Some(Sink::connect_new(stream.mixer()));
-                    sm._stream = Some(stream);
+            match AudioOutput::open() {
+                Ok(out) => {
+                    out.mixer.add(SynthSource { synth: synth.clone(), buf: Vec::new(), pos: 0 });
+                    sm.sfx_sink = Some(Sink::connect_new(&out.mixer));
+                    sm.music_sink = Some(Sink::connect_new(&out.mixer));
+                    sm.output = Some(out);
                 }
                 Err(e) => eprintln!("audio disabled: {}", e),
             }
@@ -683,7 +724,7 @@ impl SoundManager {
     /// SD_SoundPlaying: number of the current sound or 0.
     pub fn sound_playing(&self) -> i32 {
         // without an output stream nothing advances the synth
-        if self._stream.is_none() {
+        if self.output.is_none() {
             return 0;
         }
         if let Some(s) = &self.sfx_sink {
