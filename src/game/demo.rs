@@ -1624,6 +1624,13 @@ impl Game {
         self.battle.results = None;
     }
 
+    /// The high score screen was asked for (the extended options' HIGH
+    /// SCORES) or shows a battle's results: no DEMO sign, and its loading
+    /// box says "High Scores" (not in the original).
+    pub fn high_scores_shown(&self) -> bool {
+        self.demo.scorescreenkludge && (self.demo.no_panel || self.battle.results.is_some())
+    }
+
     /// The high score screen from the control panel's extended options
     /// (not in the original): until a key is pressed, then back.
     pub fn high_scores_from_menu(&mut self) {

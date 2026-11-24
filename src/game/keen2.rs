@@ -65,8 +65,11 @@ impl Game {
     fn draw_score_box_at(&mut self) {
         let scale = self.sys.surface.scale as i32;
         if self.demomode != 0 {
-            // DEMO plaque at origin + (0x800,0x80) global units
-            self.draw_overlay_sprite(DEMOPLAQUESPR, 0x80, 0x08, scale);
+            // DEMO plaque at origin + (0x800,0x80) global units (not on the
+            // high score screen asked for in the menu or after a battle)
+            if !self.high_scores_shown() {
+                self.draw_overlay_sprite(DEMOPLAQUESPR, 0x80, 0x08, scale);
+            }
             return;
         }
         // the inventory (not in the original): bottom right, with

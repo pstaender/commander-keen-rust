@@ -131,6 +131,10 @@ const BATTLECARD: usize = 23;
 const BATTLEDIFFCARD: usize = 24;
 const BATTLELEVELCARD: usize = 25;
 const BATTLETIMECARD: usize = 26;
+/// battle level card: entries on its first page (RANDOM and 6 levels)
+/// and on the others
+const LEVEL_PAGE1: usize = 7;
+const LEVEL_PAGE: usize = 8;
 /// the BATTLE entry of the new game card
 const NEWGAME_BATTLE_ITEM: usize = 3;
 /// the VOLUME entries of SOUNDCARD and MUSICCARD (not in the original)
@@ -500,6 +504,8 @@ pub struct ModState {
     pub controltype: i32,
     creature_ok: bool,
     creature_num: i32,
+    /// battle level card: the levels of its entries after RANDOM
+    battle_levels: Vec<i32>,
     /// volumes in percent as set in the menu / config (not in the
     /// original; not applied with --classic)
     pub sfx_volume: u8,
@@ -523,6 +529,7 @@ impl Default for ModState {
             quickslot: None,
             page: 0,
             extra_present: [false; 2],
+            battle_levels: Vec::new(),
             compatibility: false,
             jerk: false,
             controltype: 0,
@@ -781,6 +788,10 @@ impl Game {
         match c {
             LOADCARD if !self.opts.classic => 2,
             CHEATCARD => 2,
+            BATTLELEVELCARD => {
+                let n = self.menu.cards[BATTLELEVELCARD].items.len();
+                1 + n.saturating_sub(LEVEL_PAGE1).div_ceil(LEVEL_PAGE)
+            }
             _ => 1,
         }
     }
@@ -794,6 +805,12 @@ impl Game {
             LOADCARD if self.menu.page == 1 => (0, LOAD_EXTRA.len()),
             CHEATCARD if self.menu.page == 1 => (CHEAT_PAGE1, n - CHEAT_PAGE1),
             CHEATCARD => (0, CHEAT_PAGE1),
+            // RANDOM, a gap, the first levels; then the next levels
+            BATTLELEVELCARD if self.menu.page == 0 => (0, n.min(LEVEL_PAGE1)),
+            BATTLELEVELCARD => {
+                let first = (LEVEL_PAGE1 + (self.menu.page - 1) * LEVEL_PAGE).min(n);
+                (first, (n - first).min(LEVEL_PAGE))
+            }
             _ => (0, n),
         }
     }
@@ -1449,9 +1466,17 @@ impl Game {
                 false
             }
             UIC_SETUPCARD if c == BATTLELEVELCARD => {
-                if self.battle.level != 0 && !self.battle_levels().contains(&self.battle.level) {
-                    self.battle.level = 0;
-                }
+                // RANDOM, a gap, then every level (on pages); the cursor on
+                // the one chosen last
+                let levels = self.battle_levels();
+                let mut items = vec![item(UII_BUTTON, 0, 0x13, "RANDOM", 0, None)];
+                items.extend((0..levels.len()).map(|n| item(UII_BUTTON, if n == 0 { UI_SEPARATED } else { 0 }, 0, "", 0, None)));
+                let idx = levels.iter().position(|&l| l == self.battle.level).map_or(0, |p| p + 1);
+                self.menu.battle_levels = levels;
+                self.menu.cards[BATTLELEVELCARD].items = items;
+                let (page, cur) = if idx < LEVEL_PAGE1 { (0, idx) } else { (1 + (idx - LEVEL_PAGE1) / LEVEL_PAGE, (idx - LEVEL_PAGE1) % LEVEL_PAGE) };
+                self.menu.page = page;
+                self.menu.cards[BATTLELEVELCARD].cursor = cur;
                 false
             }
             UIC_TOUCHUPCARD => {
@@ -1462,15 +1487,22 @@ impl Game {
                     _ => "BATTLE: TIME",
                 };
                 self.usl_draw_text_title(t);
+                let pages = self.cp_pages(c);
+                if pages > 1 {
+                    let p = format!("{}/{}", self.menu.page + 1, pages);
+                    self.usl_draw_page_number(&p);
+                }
                 false
             }
             UIC_DRAW if c == BATTLELEVELCARD => {
-                let mut name = Self::battle_level_name(self.battle.level);
-                // (long names are cut to fit between the arrows)
-                while name.len() > 1 && self.cp_measure(&format!("< {} >", name)).0 > 0x90 {
+                let i = i.unwrap_or(0);
+                let n = i + self.cp_page_range(c).0;
+                let mut name = if n == 0 { "RANDOM".to_string() } else { Self::battle_level_name(self.menu.battle_levels[n - 1]) };
+                // (long names are cut to fit)
+                while name.len() > 1 && self.cp_measure(&name).0 > 0x90 {
                     name.pop();
                 }
-                self.usl_draw_item_text(0, &format!("< {} >", name.trim_end()));
+                self.usl_draw_item_text(i, name.trim_end());
                 true
             }
             UIC_DRAW if c == BATTLETIMECARD && i == Some(0) => {
@@ -1489,7 +1521,11 @@ impl Game {
                         self.battle.difficulty = i as i32 + GD_EASY;
                         self.usl_down_level(BATTLELEVELCARD);
                     }
-                    BATTLELEVELCARD => self.usl_down_level(BATTLETIMECARD),
+                    BATTLELEVELCARD => {
+                        let n = i + self.cp_page_range(c).0;
+                        self.battle.level = if n == 0 { 0 } else { self.menu.battle_levels[n - 1] };
+                        self.usl_down_level(BATTLETIMECARD);
+                    }
                     _ => {
                         self.usl_confirm_comm(UC_BATTLE);
                     }
@@ -1500,28 +1536,22 @@ impl Game {
         }
     }
 
-    /// Left / right on the battle level and time cards.
+    /// Left / right on the battle time card.
     fn usl_battle_change(&mut self, d: i32) {
-        if self.cp_top() == BATTLELEVELCARD {
-            // RANDOM, then the levels
-            let mut l = vec![0];
-            l.extend(self.battle_levels());
-            let i = l.iter().position(|&n| n == self.battle.level).unwrap_or(0) as i32;
-            self.battle.level = l[(i + d).rem_euclid(l.len() as i32) as usize];
-            self.usl_draw_item(0);
-        } else {
-            self.battle.minutes = (self.battle.minutes + d).clamp(1, super::battle::MAXMINUTES);
-            self.usl_draw_item(0);
-        }
+        self.battle.minutes = (self.battle.minutes + d).clamp(1, super::battle::MAXMINUTES);
+        self.usl_draw_item(0);
     }
 
     /// The title of a card without a title picture (the cards added by
-    /// this port).
+    /// this port), laid out like the pictures ("-NEW GAME MENU----"): at
+    /// the left on the title line, centered on it.
     fn usl_draw_text_title(&mut self, s: &str) {
-        let (w, _) = self.cp_measure(s);
+        let (w, h) = self.cp_measure(s);
         self.cp_hlin(0x4d, 0xe7, 0x37, 10);
-        self.menu.px = ((0xa0 - w) as u16 >> 1) as i32 + 0x4a;
-        self.menu.py = 0x31;
+        let y = 0x37 - h / 2;
+        self.cp_bar(0x4f, y, w + 2, h, BACKCOLOR);
+        self.menu.px = 0x50;
+        self.menu.py = y;
         self.tw.fontcolor = 10;
         self.cp_draw_string(s);
         self.tw.fontcolor = 15;
@@ -2350,7 +2380,7 @@ impl Game {
     /// USL_SetUpCard (0x2b152)
     fn usl_set_up_card(&mut self) {
         let top = self.cp_top();
-        self.menu.footer[0] = if top == BATTLELEVELCARD || top == BATTLETIMECARD { "Arrows change" } else { "Arrows move" };
+        self.menu.footer[0] = if top == BATTLETIMECARD { "Arrows change" } else { "Arrows move" };
         self.menu.footer[1] = "Enter selects";
         self.menu.footer[2] = if self.menu.stack.len() != 1 {
             "ESC to back out"
@@ -2657,7 +2687,7 @@ impl Game {
                         resetitem = true;
                     }
                     // battle cards: left / right change the level / time
-                    SC_LEFTARROW | SC_RIGHTARROW if matches!(self.cp_top(), BATTLELEVELCARD | BATTLETIMECARD) => {
+                    SC_LEFTARROW | SC_RIGHTARROW if self.cp_top() == BATTLETIMECARD => {
                         self.usl_battle_change(if ls == SC_RIGHTARROW { 1 } else { -1 });
                         resetitem = true;
                     }
