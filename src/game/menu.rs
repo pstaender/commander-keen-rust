@@ -113,13 +113,20 @@ const JERKCARD: usize = 18;
 /// and "OPTIONS 2/2"
 const CHEATCARD: usize = 19;
 /// the entries of the first page of the extended options card
-const CHEAT_PAGE1: usize = 5;
-/// the HIGH SCORES entry of the extended options card
+const CHEAT_PAGE1: usize = 6;
+/// the entries of the extended options card (page 1: inventory, zoom,
+/// players, unlimited lives / ammo, re-enter; page 2: the rest)
+const CHEAT_INVENTORY_ITEM: usize = 0;
+const CHEAT_ZOOM_ITEM: usize = 1;
+/// the PLAYERS entry (needs a gamepad)
+const CHEAT_PLAYERS_ITEM: usize = 2;
+const CHEAT_UNLLIVES_ITEM: usize = 3;
+const CHEAT_UNLAMMO_ITEM: usize = 4;
+const CHEAT_REENTER_ITEM: usize = 5;
+const CHEAT_LIFE_ITEM: usize = 6;
+const CHEAT_SHOT_ITEM: usize = 7;
 const CHEAT_SCORES_ITEM: usize = 8;
-/// the END GAME entry of the extended options card
 const CHEAT_ENDGAME_ITEM: usize = 9;
-/// the PLAYERS entry of the extended options card (needs a gamepad)
-const CHEAT_PLAYERS_ITEM: usize = 7;
 /// a gamepad is connected: "USE GAMEPAD" (replaces the joystick entries
 /// of the config card) and its movement / button binding cards
 const PADCARD: usize = 20;
@@ -386,15 +393,15 @@ fn build_cards() -> Vec<Card> {
             0,
             0x16,
             vec![
-                b(0x26, "ADD EXTRA LIFE", 0),
-                b(0x1f, "ADD EXTRA SHOT", 0),
-                b(0x13, "ALLOW RE-ENTER", 0),
-                b(0x16, "UNLIMITED LIVES", 0),
-                b(0x1e, "UNLIMITED AMMO", 0),
                 b(0x17, "SHOW INVENTORY", 0),
                 b(0x2c, "ZOOM", 0),
                 b(0x19, "PLAYERS", 0),
-                b(0x23, "HIGH SCORES", 0),
+                b(0x16, "UNLIMITED LIVES", 0),
+                b(0x1e, "UNLIMITED AMMO", 0),
+                b(0x13, "ALLOW RE-ENTER", 0),
+                b(0x26, "ADD EXTRA LIFE", 0),
+                b(0x1f, "ADD EXTRA SHOT", 0),
+                b(0x14, "THE KEENEST", 0),
                 item(UII_BUTTON, UI_SEPARATED, 0x12, "END GAME", 2, None),
             ],
             Custom::Cheat,
@@ -1775,7 +1782,7 @@ impl Game {
         match call {
             UIC_SETUPCARD => {
                 // lives, shots and END GAME only exist in a running game
-                for n in [0, 1, CHEAT_ENDGAME_ITEM] {
+                for n in [CHEAT_LIFE_ITEM, CHEAT_SHOT_ITEM, CHEAT_ENDGAME_ITEM] {
                     let it = &mut self.menu.cards[CHEATCARD].items[n];
                     if self.menu.ingame {
                         it.flags &= !UI_DISABLED;
@@ -1802,14 +1809,14 @@ impl Game {
                 let i = i.unwrap_or(0);
                 let n = i + self.cp_page_range(CHEATCARD).0;
                 let text = match n {
-                    0 => format!("ADD EXTRA LIFE [{}]", self.gs.lives),
-                    1 => format!("ADD EXTRA SHOT [{}]", self.gs.ammo),
-                    2 => format!("ALLOW RE-ENTER [{}]", if self.opts.allow_reenter { "X" } else { " " }),
-                    3 => format!("UNLIMITED LIVES [{}]", if self.opts.unlimited_lives { "X" } else { " " }),
-                    4 => format!("UNLIMITED AMMO [{}]", if self.opts.unlimited_ammo { "X" } else { " " }),
-                    5 => format!("SHOW INVENTORY [{}]", if self.opts.hide_inventory { " " } else { "X" }),
-                    6 => format!("ZOOM [{}%]", self.zoom()),
-                    7 => format!("PLAYERS [{}]", self.mp.players.clamp(1, 4)),
+                    CHEAT_LIFE_ITEM => format!("ADD EXTRA LIFE [{}]", self.gs.lives),
+                    CHEAT_SHOT_ITEM => format!("ADD EXTRA SHOT [{}]", self.gs.ammo),
+                    CHEAT_REENTER_ITEM => format!("ALLOW RE-ENTER [{}]", if self.opts.allow_reenter { "X" } else { " " }),
+                    CHEAT_UNLLIVES_ITEM => format!("UNLIMITED LIVES [{}]", if self.opts.unlimited_lives { "X" } else { " " }),
+                    CHEAT_UNLAMMO_ITEM => format!("UNLIMITED AMMO [{}]", if self.opts.unlimited_ammo { "X" } else { " " }),
+                    CHEAT_INVENTORY_ITEM => format!("SHOW INVENTORY [{}]", if self.opts.hide_inventory { " " } else { "X" }),
+                    CHEAT_ZOOM_ITEM => format!("ZOOM [{}%]", self.zoom()),
+                    CHEAT_PLAYERS_ITEM => format!("PLAYERS [{}]", self.mp.players.clamp(1, 4)),
                     _ => return false,
                 };
                 self.usl_draw_item_text(i, &text);
@@ -1825,13 +1832,13 @@ impl Game {
                         self.usl_show_high_scores();
                         return true;
                     }
-                    0 => self.gs.lives = (self.gs.lives + 1).min(CHEATMAX),
-                    1 => self.gs.ammo = (self.gs.ammo + 1).min(CHEATMAX),
-                    3 => self.opts.unlimited_lives = !self.opts.unlimited_lives,
-                    4 => self.opts.unlimited_ammo = !self.opts.unlimited_ammo,
-                    5 => self.opts.hide_inventory = !self.opts.hide_inventory,
+                    CHEAT_LIFE_ITEM => self.gs.lives = (self.gs.lives + 1).min(CHEATMAX),
+                    CHEAT_SHOT_ITEM => self.gs.ammo = (self.gs.ammo + 1).min(CHEATMAX),
+                    CHEAT_UNLLIVES_ITEM => self.opts.unlimited_lives = !self.opts.unlimited_lives,
+                    CHEAT_UNLAMMO_ITEM => self.opts.unlimited_ammo = !self.opts.unlimited_ammo,
+                    CHEAT_INVENTORY_ITEM => self.opts.hide_inventory = !self.opts.hide_inventory,
                     // 100 -> 75 -> 50 -> 100 (applied when the game goes on)
-                    6 => {
+                    CHEAT_ZOOM_ITEM => {
                         let zs = crate::options::ZOOMS;
                         let i = zs.iter().position(|&z| z == self.zoom()).unwrap_or(0);
                         self.opts.zoom = zs[(i + 1) % zs.len()];
@@ -1840,7 +1847,7 @@ impl Game {
                     // multiplayer mode (at once when the game goes on), the
                     // same as in CONFIGURE > USE GAMEPAD: 1, 2, ... as many
                     // as the gamepads allow, 1
-                    7 => {
+                    CHEAT_PLAYERS_ITEM => {
                         self.mp_next_players();
                         self.usl_set_options_text();
                     }

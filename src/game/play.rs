@@ -1048,7 +1048,7 @@ impl Game {
         self.stop_music();
     }
 
-    fn demo_user_input(&mut self) -> bool {
+    pub(super) fn demo_user_input(&mut self) -> bool {
         self.sys.poll();
         let c = self.sys.input.read_control();
         self.sys.input.last_scan != 0 || c.button0 || c.button1

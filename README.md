@@ -39,7 +39,7 @@ Play in widescreen mode:
 
 <img width="1840" height="864" alt="widescreen" src="https://github.com/user-attachments/assets/7a850433-dee2-4e36-bdd2-6334ec218613" />
 
-Adding additional lives and armor, unlimited lives and ammo (the score box then leaves those counters empty), zoom out the play field (see [Zoom](#zoom)), choose the number of players (see [Multiplayer](#multiplayer)) and replay completed levels with the extended options (EXTENDED OPTIONS in the main menu, two pages of the OPTIONS MENU turned with the arrow keys like LOAD GAME, which also hold HIGH SCORES – the game's high score screen, also in the middle of a game – and END GAME; the options are remembered in `config.txt`; off with `--classic`):
+Adding additional lives and armor, unlimited lives and ammo (the score box then leaves those counters empty), zoom out the play field (see [Zoom](#zoom)), choose the number of players (see [Multiplayer](#multiplayer)) and replay completed levels with the extended options (EXTENDED OPTIONS in the main menu, two pages of the OPTIONS MENU turned with the arrow keys like LOAD GAME, the first with SHOW INVENTORY, ZOOM, PLAYERS, UNLIMITED LIVES, UNLIMITED AMMO and ALLOW RE-ENTER; they also hold THE KEENEST – the game's high score screen, also in the middle of a game, shown without Keen and the monsters until a key is pressed, like the results after a battle – and END GAME; the options are remembered in `config.txt`; off with `--classic`):
 
 <img width="1072" height="864" alt="cheat_options" src="https://github.com/user-attachments/assets/ac6dac4f-fc06-4eba-93f7-c414dfdfd283" />
 

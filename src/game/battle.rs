@@ -688,7 +688,10 @@ mod tests {
         g.objs[p].x += 0x100;
         let (x, score, map) = (g.objs[p].x, g.gs.score + 100, g.gs.mapon);
         g.gs.score = score;
+        // (the screen stays until a key is pressed)
+        g.sys.script_key(200, 0x39);
         g.high_scores_keeping_game(true).unwrap();
+        assert!(g.alive());
         assert!(g.loadedgame);
         assert_eq!((g.objs[g.player].x, g.gs.score, g.gs.mapon), (x, score, map));
         let _ = std::fs::remove_dir_all(&tmp);

@@ -1524,7 +1524,11 @@ impl Game {
             if self.demo.scorescreenkludge {
                 self.draw_high_scores();
             }
-            self.play_loop();
+            if self.high_scores_shown() {
+                self.high_scores_still();
+            } else {
+                self.play_loop();
+            }
         }
         // IN_StopDemo
         self.demomode = 0;
@@ -1532,6 +1536,28 @@ impl Game {
             self.rf.bg_hook = None;
         }
         self.check_last_scan();
+    }
+
+    /// The high score screen asked for in the menu or after a battle (not
+    /// in the original): the map without Keen, enemies or other sprites,
+    /// its tiles animated, until a key or button is pressed.
+    fn high_scores_still(&mut self) {
+        let mut cur = Some(self.player);
+        while let Some(ob) = cur {
+            self.remove_sprite(ob);
+            cur = self.objs[ob].next;
+        }
+        self.start_music(self.gs.mapon);
+        self.tics = 3;
+        self.lasttimecount = 3;
+        self.sys.set_time_count(3);
+        while self.alive() {
+            self.rf_refresh();
+            if !self.screenfaded && self.demo_user_input() {
+                break;
+            }
+        }
+        self.stop_music();
     }
 
     /// ShowHighScores (0x157d6)

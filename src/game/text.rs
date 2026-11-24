@@ -122,7 +122,7 @@ The score boxes count how often each Keen was knocked out (0, -1, -2...), and th
 ^P
 {D}{H}EXTENDED OPTIONS
 {B}
-The main menu of the ComputerWrist has Extended Options, on two pages (the arrow keys turn them). There you can add lives and shots, play with unlimited lives or shots, enter finished levels again, show the inventory, zoom out, choose the number of players and look at the High Scores, even in the middle of a game. End Game is there, too. Keen remembers your choices.
+The main menu of the ComputerWrist has Extended Options, on two pages (the arrow keys turn them). On the first you can show the inventory, zoom out, choose the number of players, play with unlimited lives or shots and enter finished levels again; on the second add lives and shots and look at The Keenest (the high scores, quietly, until you press a key), even in the middle of a game. End Game is there, too. Keen remembers your choices.
 
 The inventory at the bottom right shows the gems and other items you are carrying.
 ^P

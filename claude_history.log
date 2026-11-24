@@ -1,0 +1,10 @@
+
+## Extended options order, The Keenest screen without sprites
+- Extended options card reordered (named CHEAT_*_ITEM constants): page 1
+  SHOW INVENTORY, ZOOM, PLAYERS, UNLIMITED LIVES/AMMO, ALLOW RE-ENTER
+  (6 entries); page 2 the rest.
+  HIGH SCORES renamed THE KEENEST (hotkey T, loading box "The Keenest").
+- The high score screen asked for in the menu or after a battle
+  (`high_scores_shown`) no longer replays demo 4: `high_scores_still`
+  removes all sprites and only animates the map until a key/button
+  (stays forever). The demo loop's high score demo is unchanged.

@@ -159,7 +159,7 @@ impl Game {
             let text = if self.demomode == 0 {
                 LEVELENTER.get(self.gs.mapon as usize).copied().unwrap_or("").to_string()
             } else if self.high_scores_shown() {
-                "High Scores".to_string()
+                "The Keenest".to_string()
             } else {
                 "DEMO".to_string()
             };

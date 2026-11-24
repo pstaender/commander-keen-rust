@@ -648,6 +648,12 @@ impl Sys {
         crate::dump::write_png(path, s.w, s.h, &rgba)
     }
 
+    /// Tests: presses key `sc` `after` frames from now (like KEEN_KEYS).
+    #[cfg(test)]
+    pub fn script_key(&mut self, after: u64, sc: u8) {
+        self.script.push((self.frame + after, sc, 3));
+    }
+
     /// Saves debugging screenshots (of what the window would show).
     fn debug_frame(&mut self, identity: bool) {
         self.frame += 1;
