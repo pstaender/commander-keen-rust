@@ -140,6 +140,16 @@ runtime and are never committed.
   In extended mode the inventory (gems, K5 keycard, K6 special items) is
   shown at the bottom right (`draw_items_box`, extended option SHOW
   INVENTORY, on by default; on the world map only the K6 special items).
+- Battle mode (`src/game/battle.rs`, NEW GAME > BATTLE, menu cards
+  BATTLECARD..BATTLETIMECARD): on top of the multiplayer mode
+  (`Game::battle_on()`, `BattleState`; `mp_count` uses `battle.players`,
+  the config's `players` stays). Started by `UC_BATTLE` -> `new_game` ->
+  `battle_begin`; `battle_setup_level` (monsters removed / remembered,
+  per episode `BATTLE_KEEP`/`BATTLE_REMOVE` in ep.rs), `battle_tick`
+  (clock, items back after 10 s, hard monsters wake up), `battle_guard`
+  (only the time ends the level, `EX_BATTLEOVER`), results on the high
+  score screen (`battle.results`, `draw_battle_results`). Doors blocked in
+  `check_enter_house`; no saving, zoom 50.
 - `--classic` (`Options::classic`) switches the additions off: it implies
   `classic_view` and `no_auto_save`, hides MIDI MUSIC and the volume bars
   of the sound/music cards and disables

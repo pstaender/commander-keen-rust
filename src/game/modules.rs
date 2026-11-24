@@ -1,4 +1,6 @@
 // The shared CK_* modules, declared in every episode module (src/ckN/mod.rs).
+#[path = "../game/battle.rs"]
+pub mod battle;
 #[path = "../game/defs.rs"]
 pub mod defs;
 #[path = "../game/demo.rs"]

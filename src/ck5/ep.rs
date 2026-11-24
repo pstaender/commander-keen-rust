@@ -11,6 +11,11 @@ use super::Game;
 use super::act2::AMPTONOBJ;
 use super::act3::KORATHOBJ;
 
+/// battle mode: classes that aren't monsters (an easy battle removes the
+/// monsters), and the ones that would end the level (always removed)
+pub const BATTLE_KEEP: &[i32] = &[super::act1::TELEPORTEROBJ, super::act3::QEDOBJ, super::act3::QEDFLASHOBJ];
+pub const BATTLE_REMOVE: &[i32] = &[];
+
 /// Object classes used by the shared code, values from the executable;
 /// the actor modules define their own classes.
 pub mod obclass {

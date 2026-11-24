@@ -346,6 +346,11 @@ impl Game {
         // walking off the map's left or right edge completes the level
         let right = if c.wide() { (self.mapwidth - 2) * 256 } else { c.originxmax + 0x1400 };
         if (o.left as u16) < c.originxmin as u16 || (right as u16) < o.right as u16 {
+            if self.battle_on() {
+                // (nobody leaves a battle)
+                self.battle_keep_in(ob, right);
+                return;
+            }
             self.playstate = EX_COMPLETED;
             return;
         }
@@ -747,7 +752,7 @@ impl Game {
         // extended mode: F2 quick saves, F3 quick loads the last used slot
         // (only once a game was loaded or saved, otherwise the panel opens)
         let ls = self.sys.input.last_scan;
-        if self.opts.cheatmode && !self.opts.classic && !self.storedemo && (ls == SC_F2 || ls == SC_F3) {
+        if self.opts.cheatmode && !self.opts.classic && !self.storedemo && !self.battle_on() && (ls == SC_F2 || ls == SC_F3) {
             let done = if ls == SC_F2 { self.quick_save() } else { self.quick_load() };
             if done {
                 self.rf_force_refresh();
@@ -756,7 +761,7 @@ impl Game {
             }
         }
         // extended mode: - zooms the play field out (75, 50 percent), + back in
-        if self.opts.cheatmode && !self.opts.classic && self.demomode == 0 && !self.storedemo {
+        if self.opts.cheatmode && !self.opts.classic && self.demomode == 0 && !self.storedemo && !self.battle_on() {
             let out = matches!(ls, 0x0c | 0x4a);
             if out || matches!(ls, 0x0d | 0x4e) {
                 self.step_zoom(out);
@@ -767,7 +772,7 @@ impl Game {
         self.autosave_tick();
         // gamepad SAVE STATE / LOAD STATE (not in the original)
         let (save, load) = (std::mem::take(&mut self.sys.input.pad_save), std::mem::take(&mut self.sys.input.pad_load));
-        if !self.opts.classic && !self.storedemo && self.demomode == 0 && (save || load) {
+        if !self.opts.classic && !self.storedemo && self.demomode == 0 && !self.battle_on() && (save || load) {
             if save {
                 self.save_state();
             } else {
@@ -994,6 +999,7 @@ impl Game {
             }
             self.mp_tick();
             self.mp_world_tick();
+            self.battle_tick();
             if self.loadedgame {
                 self.loadedgame = false;
             }
@@ -1031,6 +1037,8 @@ impl Game {
                 // council member was rescued, Keen 5 the QED destroyed
                 self.playstate = ep_sel!(EX_RESCUED, EX_QEDBROKE, EX_MOLLY);
             }
+            // battle mode: only the time ends the level
+            self.battle_guard();
             if self.playstate != EX_STILLPLAYING {
                 break;
             }

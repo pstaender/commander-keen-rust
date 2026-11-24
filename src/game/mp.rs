@@ -145,7 +145,7 @@ impl Game {
     /// Multiplayer mode can be played: chosen, a gamepad is connected, not
     /// in demos and not with --classic.
     pub fn mp_available(&self) -> bool {
-        self.mp.enabled() && !self.opts.classic && self.demomode == 0 && !self.storedemo && self.sys.input.pad_connected
+        (self.mp.enabled() || self.battle.active) && !self.opts.classic && self.demomode == 0 && !self.storedemo && self.sys.input.pad_connected
     }
 
     /// Number of players playing: as chosen, but at most one more than
@@ -154,7 +154,9 @@ impl Game {
         if !self.mp_available() {
             return 1;
         }
-        self.mp.players.min(self.sys.input.pad_count.max(1) + 1).clamp(2, MAXPLAYERS)
+        // (a battle has its own number of players)
+        let n = if self.battle.active { self.battle.players } else { self.mp.players };
+        n.min(self.sys.input.pad_count.max(1) + 1).clamp(2, MAXPLAYERS)
     }
 
     /// The next number of players in the menus: 1, 2, ... as many as the
@@ -427,10 +429,11 @@ impl Game {
         (self.mp_in_level() || self.mp.cur != 0) && self.mp.dizzy[self.mp.cur] > 0
     }
 
-    /// Shots found: every player gets them.
+    /// Shots found: every player gets them (in a battle only the one who
+    /// found them).
     pub fn give_ammo(&mut self, n: i32) {
         self.gs.ammo += n;
-        if self.mp_in_level() || self.mp.cur != 0 {
+        if (self.mp_in_level() || self.mp.cur != 0) && !self.battle_on() {
             for k in 1..MAXPLAYERS {
                 if k == self.mp.cur || self.mp_slot_active(k) || self.mp.slots[k].out {
                     self.mp.slots[k].vars.ammo += n;
@@ -464,7 +467,21 @@ impl Game {
         self.mp.dizzy[k] = DIZZYTICS;
         self.play_sound(super::keen::SND_HELMETHIT);
         self.mp_knock_off_pogo(k, ob);
+        self.battle_strike(owner - 1, k);
         true
+    }
+
+    /// Battle: the leading Keen died; another living one takes the lead and
+    /// the dead one comes back. False if nobody else is alive.
+    pub fn mp_battle_handover(&mut self) -> bool {
+        let Some(k) = self.mp_handover(true) else { return false };
+        self.mp_slot_died(k);
+        true
+    }
+
+    /// Battle: the Keen of slot `k` takes the lead (he hit the leading one).
+    pub fn mp_battle_lead_to(&mut self, k: usize) {
+        self.mp_handover_to(k);
     }
 
     // ---- levels ---------------------------------------------------------
@@ -632,7 +649,8 @@ impl Game {
         let Some(n) = self.mp.slots[k].obj.take() else { return };
         self.remove_obj(n);
         self.mp.dizzy[k] = 0;
-        let unlimited = self.unlimited_lives();
+        // (a battle: everybody comes back, the deaths are counted)
+        let unlimited = self.unlimited_lives() || self.battle_on();
         let s = &mut self.mp.slots[k];
         s.vars.riding = None;
         if unlimited {
@@ -736,6 +754,11 @@ impl Game {
             let dying = self.keen_obj_dying(ob);
             let right = if c.wide() { (self.mapwidth - 2) * 256 } else { c.originxmax + 0x1400 };
             if !dying && ((o.left as u16) < c.originxmin as u16 || (right as u16) < o.right as u16) {
+                if self.battle_on() {
+                    // (nobody leaves a battle)
+                    self.battle_keep_in(ob, right);
+                    continue;
+                }
                 self.playstate = EX_COMPLETED;
             } else if !dying && (self.fall_line() as u16) < o.bottom as u16 {
                 self.objs[ob].y -= o.bottom - self.fall_line();

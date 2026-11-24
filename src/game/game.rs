@@ -15,6 +15,8 @@ impl Game {
         self.gs.nextextra = 20000;
         self.gs.lives = 3;
         self.gs.ammo = 5;
+        // battle mode chosen in the control panel: its level and players
+        self.battle_begin();
         self.mp_new_game();
         // multiplayer mode (not in the original): the lives are shared, so
         // three per player
@@ -93,6 +95,10 @@ impl Game {
     /// always 100 with --classic (demos and --classic-view keep the
     /// original view anyway, see `update_view`).
     pub fn zoom(&self) -> u8 {
+        // battle mode: always 50 percent
+        if self.battle_on() && self.opts.cheatmode {
+            return 50;
+        }
         if !self.opts.cheatmode || self.opts.classic || !ZOOMS.contains(&self.opts.zoom) {
             100
         } else {
@@ -144,6 +150,7 @@ impl Game {
         self.rf_new_map();
         self.scan_info_plane();
         self.mp_setup_level();
+        self.battle_setup_level();
         if self.gs.mapon == 0 {
             self.scan_world_flags();
         }
@@ -283,6 +290,7 @@ impl Game {
         }
         self.autosave_time = self.sys.time_count();
         self.game_loop_inner();
+        self.battle_stop();
         if self.alive() {
             // the game ended (game over, won, END GAME): nothing to resume
             self.discard_autosave();
@@ -426,6 +434,10 @@ impl Game {
                 }
                 EX_ABORTGAME => {
                     self.sys.input.clear_keys_down();
+                    return;
+                }
+                super::battle::EX_BATTLEOVER => {
+                    self.battle_finish();
                     return;
                 }
                 EX_MOLLY => {

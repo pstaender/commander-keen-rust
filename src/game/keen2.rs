@@ -75,6 +75,8 @@ impl Game {
         if self.opts.cheatmode && !self.opts.hide_inventory && !self.opts.classic {
             self.draw_items_box();
         }
+        // battle mode: the time left
+        self.draw_battle_timer();
         if !self.showscorebox {
             return;
         }
@@ -182,7 +184,10 @@ impl Game {
         // empty with the extended options UNLIMITED AMMO / LIVES.
         let a = if self.unlimited_ammo() { String::new() } else if ammo < 100 { ammo.to_string() } else { "99".into() };
         self.draw_score_digits(&a, 2, base_x + 64, base_y + 20);
-        let l = if self.unlimited_lives() {
+        // (battle mode: the deaths instead of the lives)
+        let l = if self.battle_on() {
+            self.battle.deaths[n].min(99).to_string()
+        } else if self.unlimited_lives() {
             String::new()
         } else if self.gs.lives < 100 {
             self.gs.lives.to_string()

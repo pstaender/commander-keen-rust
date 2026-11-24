@@ -12,6 +12,11 @@ use super::act1::{ARACHNUTOBJ, MADMUSHROOMOBJ, ORACLEOBJ};
 use super::act2::{BERKELOIDOBJ, BOUNDEROBJ, FOOTOBJ};
 use super::act3::LINDSEYOBJ;
 
+/// battle mode: classes that aren't monsters (an easy battle removes the
+/// monsters), and the ones that would end the level (always removed)
+pub const BATTLE_KEEP: &[i32] = &[super::act3::WETSUITOBJ, FOOTOBJ, ORACLEOBJ, LINDSEYOBJ];
+pub const BATTLE_REMOVE: &[i32] = &[FOOTOBJ, ORACLEOBJ, LINDSEYOBJ];
+
 /// sound of a rescued council member
 const SND_RESCUED: i32 = 0x1f;
 

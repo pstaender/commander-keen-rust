@@ -895,6 +895,8 @@ impl Game {
 
     /// StunObj: switch an enemy to its stunned state.
     pub fn stun_obj(&mut self, ob: usize, shot: usize, stunstate: StateRef) {
+        // battle mode: points for the shooter, hard monsters wake up again
+        self.battle_stunned(ob, shot);
         self.explode_shot(shot);
         {
             let o = &mut self.objs[ob];

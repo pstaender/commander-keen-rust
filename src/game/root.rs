@@ -101,6 +101,8 @@ pub struct Game {
     pub demo: demo::DemoState,
     /// multiplayer mode, up to 4 players (not in the original)
     pub mp: mp::MpState,
+    /// battle mode (not in the original)
+    pub battle: battle::BattleState,
 
     // per-module state of the ported CK6 modules
     pub act1: act1::ModState,
@@ -183,6 +185,7 @@ impl Game {
             restartdifficulty: 0,
             demo: demo::DemoState::default(),
             mp: mp::MpState::default(),
+            battle: battle::BattleState::default(),
             act1: Default::default(),
             act2: Default::default(),
             act3: Default::default(),

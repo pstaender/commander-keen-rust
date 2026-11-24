@@ -45,6 +45,9 @@ const UC_QUIT: i32 = 3;
 const UC_LOADED: i32 = 4;
 const UC_SEASY: i32 = 5;
 const UC_SHARD: i32 = 7;
+/// battle mode: start the battle chosen in the battle cards (not in the
+/// original)
+const UC_BATTLE: i32 = 8;
 
 // graphics chunks
 const CP_PADDLEWARPIC: i32 = ep_sel!(0x5c, 0x4f, 0x17);
@@ -106,10 +109,15 @@ const GAMEPADCARD: usize = 17;
 /// Keen 5 only: the "FIX JERKY MOTION" option
 const JERKCARD: usize = 18;
 /// extended mode: the "EXTENDED OPTIONS" card (replaces END GAME in the
-/// main menu and holds it as its last entry)
+/// main menu and holds it as its last entry); two pages, "OPTIONS 1/2"
+/// and "OPTIONS 2/2"
 const CHEATCARD: usize = 19;
+/// the entries of the first page of the extended options card
+const CHEAT_PAGE1: usize = 5;
+/// the HIGH SCORES entry of the extended options card
+const CHEAT_SCORES_ITEM: usize = 8;
 /// the END GAME entry of the extended options card
-const CHEAT_ENDGAME_ITEM: usize = 8;
+const CHEAT_ENDGAME_ITEM: usize = 9;
 /// the PLAYERS entry of the extended options card (needs a gamepad)
 const CHEAT_PLAYERS_ITEM: usize = 7;
 /// a gamepad is connected: "USE GAMEPAD" (replaces the joystick entries
@@ -117,6 +125,14 @@ const CHEAT_PLAYERS_ITEM: usize = 7;
 const PADCARD: usize = 20;
 const PADMOVECARD: usize = 21;
 const PADBUTTONSCARD: usize = 22;
+/// battle mode (NEW GAME > BATTLE), one card per step: players,
+/// difficulty, level, time (not in the original)
+const BATTLECARD: usize = 23;
+const BATTLEDIFFCARD: usize = 24;
+const BATTLELEVELCARD: usize = 25;
+const BATTLETIMECARD: usize = 26;
+/// the BATTLE entry of the new game card
+const NEWGAME_BATTLE_ITEM: usize = 3;
 /// the VOLUME entries of SOUNDCARD and MUSICCARD (not in the original)
 const SOUND_VOLUME_ITEM: usize = 4;
 const MUSIC_VOLUME_ITEM: usize = 3;
@@ -179,6 +195,8 @@ enum Custom {
     /// sound / music cards: volume bar, MIDI entry (not in the original)
     Sound,
     Music,
+    /// the battle cards (not in the original)
+    Battle,
 }
 
 #[derive(Clone)]
@@ -242,7 +260,13 @@ fn build_cards() -> Vec<Card> {
             8,
             0,
             0xc,
-            vec![b(0x12, "BEGIN EASY GAME", 5), b(0x31, "BEGIN NORMAL GAME", 6), b(0x23, "BEGIN HARD GAME", 7)],
+            vec![
+                b(0x12, "BEGIN EASY GAME", 5),
+                b(0x31, "BEGIN NORMAL GAME", 6),
+                b(0x23, "BEGIN HARD GAME", 7),
+                // battle mode (not in the original, removed with --classic)
+                item(UII_FOLDER, UI_SEPARATED, 0x30, "BATTLE", 0, Some(BATTLECARD)),
+            ],
             Custom::None,
             1,
         ),
@@ -351,11 +375,12 @@ fn build_cards() -> Vec<Card> {
         // Keen 5: GAMEPADCARD, JERKCARD
         card(0, 0, 0x15, Vec::new(), Custom::Gamepad, 0),
         card(0, 0, 0, Vec::new(), Custom::Jerk, 0),
-        // CHEATCARD (extended options, not in the original)
+        // CHEATCARD (extended options, not in the original; with the title
+        // picture of the options card, "OPTIONS MENU")
         card(
             8,
             0,
-            0,
+            0x16,
             vec![
                 b(0x26, "ADD EXTRA LIFE", 0),
                 b(0x1f, "ADD EXTRA SHOT", 0),
@@ -365,7 +390,8 @@ fn build_cards() -> Vec<Card> {
                 b(0x17, "SHOW INVENTORY", 0),
                 b(0x2c, "ZOOM", 0),
                 b(0x19, "PLAYERS", 0),
-                b(0x12, "END GAME", 2),
+                b(0x23, "HIGH SCORES", 0),
+                item(UII_BUTTON, UI_SEPARATED, 0x12, "END GAME", 2, None),
             ],
             Custom::Cheat,
             0,
@@ -399,6 +425,26 @@ fn build_cards() -> Vec<Card> {
                 b(0x26, "LOAD STATE", 0),
             ],
             Custom::PadSet,
+            0,
+        ),
+        // BATTLECARD, BATTLEDIFFCARD, BATTLELEVELCARD, BATTLETIMECARD (not
+        // in the original)
+        card(8, 0, 0, vec![b(0x03, "2 PLAYERS", 0), b(0x04, "3 PLAYERS", 0), b(0x05, "4 PLAYERS", 0)], Custom::Battle, 0),
+        card(
+            8,
+            0,
+            0,
+            vec![b(0x12, "EASY (NO MONSTERS)", 0), b(0x31, "NORMAL (MONSTERS)", 0), b(0x23, "HARD (THEY WAKE UP)", 0)],
+            Custom::Battle,
+            1,
+        ),
+        card(8, 0, 0, vec![b(0x26, "LEVEL", 0)], Custom::Battle, 0),
+        card(
+            8,
+            0,
+            0,
+            vec![b(0x14, "TIME", 0), item(UII_BUTTON, UI_SEPARATED, 0x1f, "START BATTLE", 0, None)],
+            Custom::Battle,
             0,
         ),
     ];
@@ -440,9 +486,10 @@ pub struct ModState {
     games: Vec<SaveSlot>,
     /// extended mode quick save/load (F2/F3): the slot last loaded or saved
     quickslot: Option<usize>,
-    /// load card page: 0 = the six saved games, 1 = quick save and
-    /// autosave (not in the original)
-    load_page: usize,
+    /// page of the top card (not in the original): load card 0 = the six
+    /// saved games, 1 = quick save and autosave; extended options card
+    /// 0 = OPTIONS 1/2, 1 = OPTIONS 2/2
+    page: usize,
     /// page 2 of the load card: the quick save / autosave files exist
     extra_present: [bool; 2],
     /// SVGA compatibility (no effect in this port)
@@ -474,7 +521,7 @@ impl Default for ModState {
             py: 0,
             games: vec![SaveSlot::default(); MAXSAVEGAMES],
             quickslot: None,
-            load_page: 0,
+            page: 0,
             extra_present: [false; 2],
             compatibility: false,
             jerk: false,
@@ -726,17 +773,39 @@ impl Game {
     }
 
     fn cp_nitems(&self, c: usize) -> usize {
-        if c == LOADCARD && self.menu.load_page == 1 {
-            return LOAD_EXTRA.len();
-        }
-        self.menu.cards[self.cp_owner(c)].items.len()
+        self.cp_page_range(c).1
     }
 
+    /// Cards with more than one page (not in the original).
+    fn cp_pages(&self, c: usize) -> usize {
+        match c {
+            LOADCARD if !self.opts.classic => 2,
+            CHEATCARD => 2,
+            _ => 1,
+        }
+    }
+
+    /// The entries shown on the current page of card `c`: (index of the
+    /// first one in `items`, count). The load card shows its six entries
+    /// on both pages (page 2 uses the first two).
+    fn cp_page_range(&self, c: usize) -> (usize, usize) {
+        let n = self.menu.cards[self.cp_owner(c)].items.len();
+        match c {
+            LOADCARD if self.menu.page == 1 => (0, LOAD_EXTRA.len()),
+            CHEATCARD if self.menu.page == 1 => (CHEAT_PAGE1, n - CHEAT_PAGE1),
+            CHEATCARD => (0, CHEAT_PAGE1),
+            _ => (0, n),
+        }
+    }
+
+    /// Entry `i` of the current page of card `c`.
     fn cp_item(&self, c: usize, i: usize) -> &Item {
+        let i = i + self.cp_page_range(c).0;
         &self.menu.cards[self.cp_owner(c)].items[i]
     }
 
     fn cp_item_mut(&mut self, c: usize, i: usize) -> &mut Item {
+        let i = i + self.cp_page_range(c).0;
         let o = self.cp_owner(c);
         &mut self.menu.cards[o].items[i]
     }
@@ -1070,7 +1139,7 @@ impl Game {
             UC_ABORT => ("REALLY END CURRENT GAME?", "PRESS Y TO END IT", dirty),
             UC_QUIT => ("REALLY QUIT?", "PRESS Y TO QUIT", true),
             UC_LOADED => ("YOU'RE IN A GAME", "PRESS Y TO LOAD GAME", dirty),
-            UC_SEASY..=UC_SHARD => ("YOU'RE IN A GAME", "PRESS Y FOR NEW GAME", dirty),
+            UC_SEASY..=UC_SHARD | UC_BATTLE => ("YOU'RE IN A GAME", "PRESS Y FOR NEW GAME", dirty),
             _ => ("", "", false),
         };
         let confirm = if dialog { self.usl_ctl_dialog(s1, s2, Some(s3)) } else { true };
@@ -1114,6 +1183,7 @@ impl Game {
             Custom::PadSet => self.usl_pad_set_custom(call, i),
             Custom::Sound => self.usl_volume_custom(call, i, SOUND_VOLUME_ITEM),
             Custom::Music => self.usl_volume_custom(call, i, MUSIC_VOLUME_ITEM),
+            Custom::Battle => self.usl_battle_custom(c, call, i),
         }
     }
 
@@ -1307,6 +1377,141 @@ impl Game {
                 true
             }
             _ => false,
+        }
+    }
+
+    /// The page of a card with pages, at the right end of the title line.
+    fn usl_draw_page_number(&mut self, s: &str) {
+        let (w, h) = self.cp_measure(s);
+        let (x, y) = (0xe4 - w, 0x37 - h / 2);
+        self.cp_bar(x - 2, y, w + 3, h, BACKCOLOR);
+        self.menu.px = x;
+        self.menu.py = y;
+        self.tw.fontcolor = 10;
+        self.cp_draw_string(s);
+        self.tw.fontcolor = 15;
+    }
+
+    /// HIGH SCORES of the extended options card (not in the original): the
+    /// game's own high score screen until a key is pressed, then back to
+    /// the panel. A running game is kept in memory (like a saved game) and
+    /// goes on afterwards like a loaded one.
+    fn usl_show_high_scores(&mut self) {
+        let (font, color) = (self.tw.fontnumber, self.tw.fontcolor);
+        self.tw.fontnumber = 0;
+        self.tw.fontcolor = 15;
+        self.sys.input.pad_menu_nav = false;
+        if let Err(e) = self.high_scores_keeping_game(self.menu.ingame) {
+            self.usl_handle_error(&e);
+        }
+        self.tw.fontnumber = font;
+        self.tw.fontcolor = color;
+        self.sys.input.pad_menu_nav = true;
+        self.set_screen_width(true);
+        self.usl_draw_ctl_panel();
+    }
+
+    /// The high score screen; a running game (`ingame`) is kept like a
+    /// saved game and restored afterwards like a loaded one.
+    pub(super) fn high_scores_keeping_game(&mut self, ingame: bool) -> Result<(), String> {
+        let saved = ingame.then(|| self.save_game_bytes("HIGH SCORES"));
+        let (playstate, demomode) = (self.playstate, self.demomode);
+        self.high_scores_from_menu();
+        self.stop_music();
+        self.playstate = playstate;
+        self.demomode = demomode;
+        if let Some(d) = saved {
+            self.load_game_bytes(&d)?;
+            self.loadedgame = true;
+        }
+        Ok(())
+    }
+
+    /// The battle cards (not in the original): the steps of NEW GAME >
+    /// BATTLE (players, difficulty, level, time).
+    fn usl_battle_custom(&mut self, c: usize, call: i32, i: Option<usize>) -> bool {
+        match call {
+            UIC_SETUPCARD if c == BATTLECARD => {
+                // one gamepad per player but one (the keyboard)
+                let max = self.mp_max_players();
+                if max < 2 {
+                    self.usl_ctl_dialog("BATTLE NEEDS A GAMEPAD", "FOR EVERY PLAYER BUT ONE", None);
+                    return true;
+                }
+                for (n, it) in self.menu.cards[BATTLECARD].items.iter_mut().enumerate() {
+                    if n + 2 > max {
+                        it.flags |= UI_DISABLED;
+                    } else {
+                        it.flags &= !UI_DISABLED;
+                    }
+                }
+                self.menu.cards[BATTLECARD].cursor = self.battle.players.clamp(2, max) - 2;
+                false
+            }
+            UIC_SETUPCARD if c == BATTLELEVELCARD => {
+                if self.battle.level != 0 && !self.battle_levels().contains(&self.battle.level) {
+                    self.battle.level = 0;
+                }
+                false
+            }
+            UIC_TOUCHUPCARD => {
+                let t = match c {
+                    BATTLECARD => "BATTLE: PLAYERS",
+                    BATTLEDIFFCARD => "BATTLE: DIFFICULTY",
+                    BATTLELEVELCARD => "BATTLE: LEVEL",
+                    _ => "BATTLE: TIME",
+                };
+                self.usl_draw_text_title(t);
+                false
+            }
+            UIC_DRAW if c == BATTLELEVELCARD => {
+                let mut name = Self::battle_level_name(self.battle.level);
+                // (long names are cut to fit between the arrows)
+                while name.len() > 1 && self.cp_measure(&format!("< {} >", name)).0 > 0x90 {
+                    name.pop();
+                }
+                self.usl_draw_item_text(0, &format!("< {} >", name.trim_end()));
+                true
+            }
+            UIC_DRAW if c == BATTLETIMECARD && i == Some(0) => {
+                let m = self.battle.minutes;
+                self.usl_draw_item_text(0, &format!("TIME < {}:00 >", m));
+                true
+            }
+            UIC_HIT => {
+                let i = i.unwrap_or(0);
+                match c {
+                    BATTLECARD => {
+                        self.battle.players = i + 2;
+                        self.usl_down_level(BATTLEDIFFCARD);
+                    }
+                    BATTLEDIFFCARD => {
+                        self.battle.difficulty = i as i32 + GD_EASY;
+                        self.usl_down_level(BATTLELEVELCARD);
+                    }
+                    BATTLELEVELCARD => self.usl_down_level(BATTLETIMECARD),
+                    _ => {
+                        self.usl_confirm_comm(UC_BATTLE);
+                    }
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Left / right on the battle level and time cards.
+    fn usl_battle_change(&mut self, d: i32) {
+        if self.cp_top() == BATTLELEVELCARD {
+            // RANDOM, then the levels
+            let mut l = vec![0];
+            l.extend(self.battle_levels());
+            let i = l.iter().position(|&n| n == self.battle.level).unwrap_or(0) as i32;
+            self.battle.level = l[(i + d).rem_euclid(l.len() as i32) as usize];
+            self.usl_draw_item(0);
+        } else {
+            self.battle.minutes = (self.battle.minutes + d).clamp(1, super::battle::MAXMINUTES);
+            self.usl_draw_item(0);
         }
     }
 
@@ -1558,12 +1763,15 @@ impl Game {
                 false
             }
             UIC_TOUCHUPCARD => {
-                self.usl_draw_text_title("EXTENDED OPTIONS");
+                let page = format!("{}/{}", self.menu.page + 1, self.cp_pages(CHEATCARD));
+                self.usl_draw_page_number(&page);
                 false
             }
             UIC_DRAW => {
+                // i is the entry on the page, n the entry of the card
                 let i = i.unwrap_or(0);
-                let text = match i {
+                let n = i + self.cp_page_range(CHEATCARD).0;
+                let text = match n {
                     0 => format!("ADD EXTRA LIFE [{}]", self.gs.lives),
                     1 => format!("ADD EXTRA SHOT [{}]", self.gs.ammo),
                     2 => format!("ALLOW RE-ENTER [{}]", if self.opts.allow_reenter { "X" } else { " " }),
@@ -1577,11 +1785,16 @@ impl Game {
                 self.usl_draw_item_text(i, &text);
                 true
             }
-            // END GAME: the generic handling (UC_ABORT)
-            UIC_HIT if i == Some(CHEAT_ENDGAME_ITEM) => false,
             UIC_HIT => {
                 let i = i.unwrap_or(0);
-                match i {
+                let n = i + self.cp_page_range(CHEATCARD).0;
+                match n {
+                    // END GAME: the generic handling (UC_ABORT)
+                    CHEAT_ENDGAME_ITEM => return false,
+                    CHEAT_SCORES_ITEM => {
+                        self.usl_show_high_scores();
+                        return true;
+                    }
                     0 => self.gs.lives = (self.gs.lives + 1).min(CHEATMAX),
                     1 => self.gs.ammo = (self.gs.ammo + 1).min(CHEATMAX),
                     3 => self.opts.unlimited_lives = !self.opts.unlimited_lives,
@@ -1669,7 +1882,7 @@ impl Game {
     fn usl_load_flags(&mut self) {
         self.menu.extra_present = [self.state_path().exists(), self.autosave_path().exists()];
         for n in 0..MAXSAVEGAMES {
-            let present = if self.menu.load_page == 1 {
+            let present = if self.menu.page == 1 {
                 n < LOAD_EXTRA.len() && self.menu.extra_present[n]
             } else {
                 self.menu.games[n].present
@@ -1683,14 +1896,20 @@ impl Game {
         }
     }
 
-    /// Load card: shows page `page` with the cursor on entry `cursor`.
-    fn usl_load_set_page(&mut self, page: usize, cursor: usize) {
-        for it in self.menu.cards[LOADCARD].items.iter_mut() {
+    /// Cards with pages: shows page `page` of the top card with the
+    /// cursor on entry `cursor` of it (the last one if there are fewer).
+    fn usl_set_page(&mut self, page: usize, cursor: usize) {
+        let top = self.cp_top();
+        let o = self.cp_owner(top);
+        for it in self.menu.cards[o].items.iter_mut() {
             it.flags &= !UI_SELECTED;
         }
-        self.menu.load_page = page;
-        self.usl_load_flags();
-        self.usl_select_item(LOADCARD, cursor, false);
+        self.menu.page = page;
+        if top == LOADCARD {
+            self.usl_load_flags();
+        }
+        let cursor = cursor.min(self.cp_nitems(top).saturating_sub(1));
+        self.usl_select_item(top, cursor, false);
         self.usl_draw_ctl_panel();
     }
 
@@ -1722,7 +1941,7 @@ impl Game {
         match call {
             UIC_SETUPCARD => {
                 self.usl_uid_check();
-                self.menu.load_page = 0;
+                self.menu.page = 0;
                 self.usl_load_flags();
                 false
             }
@@ -1739,7 +1958,7 @@ impl Game {
                     (it.x, it.y)
                 };
                 self.cp_bar(ix + 1, iy + 2, 0x92, 7, BACKCOLOR);
-                let (present, name) = if top == LOADCARD && self.menu.load_page == 1 {
+                let (present, name) = if top == LOADCARD && self.menu.page == 1 {
                     (self.menu.extra_present[i], LOAD_EXTRA[i].to_string())
                 } else {
                     (self.menu.games[i].present, self.menu.games[i].name.clone())
@@ -1751,7 +1970,7 @@ impl Game {
                 true
             }
             UIC_HIT => {
-                if self.menu.load_page == 1 {
+                if self.menu.page == 1 {
                     self.usl_do_load_extra(i.unwrap_or(0));
                 } else {
                     self.usl_do_load_game(i.unwrap_or(0));
@@ -2102,9 +2321,10 @@ impl Game {
     fn usl_next_item(&mut self) {
         let top = self.cp_top();
         let cur = self.menu.cards[top].cursor;
-        // load card: down from the last entry turns the page
-        if top == LOADCARD && !self.opts.classic && cur + 1 >= self.cp_nitems(top) {
-            self.usl_load_set_page(1 - self.menu.load_page, 0);
+        // cards with pages (load card): down from the last entry turns the page
+        let pages = self.cp_pages(top);
+        if pages > 1 && cur + 1 >= self.cp_nitems(top) {
+            self.usl_set_page((self.menu.page + 1) % pages, 0);
             return;
         }
         if cur + 1 < self.cp_nitems(top) {
@@ -2116,11 +2336,10 @@ impl Game {
     fn usl_prev_item(&mut self) {
         let top = self.cp_top();
         let cur = self.menu.cards[top].cursor;
-        // load card: up from the first entry turns the page
-        if top == LOADCARD && !self.opts.classic && cur == 0 {
-            let page = 1 - self.menu.load_page;
-            let last = if page == 0 { MAXSAVEGAMES } else { LOAD_EXTRA.len() } - 1;
-            self.usl_load_set_page(page, last);
+        // cards with pages: up from the first entry turns the page back
+        let pages = self.cp_pages(top);
+        if pages > 1 && cur == 0 {
+            self.usl_set_page((self.menu.page + pages - 1) % pages, usize::MAX);
             return;
         }
         if cur != 0 {
@@ -2130,7 +2349,8 @@ impl Game {
 
     /// USL_SetUpCard (0x2b152)
     fn usl_set_up_card(&mut self) {
-        self.menu.footer[0] = "Arrows move";
+        let top = self.cp_top();
+        self.menu.footer[0] = if top == BATTLELEVELCARD || top == BATTLETIMECARD { "Arrows change" } else { "Arrows move" };
         self.menu.footer[1] = "Enter selects";
         self.menu.footer[2] = if self.menu.stack.len() != 1 {
             "ESC to back out"
@@ -2147,7 +2367,7 @@ impl Game {
 
     /// USL_DownLevel (0x2b193)
     fn usl_down_level(&mut self, c: usize) {
-        self.menu.load_page = 0;
+        self.menu.page = 0;
         self.usl_push_card(c);
         if self.usl_custom(c, UIC_SETUPCARD, None) {
             self.usl_pop_card();
@@ -2226,9 +2446,14 @@ impl Game {
             }
             root.cursor = 0;
         } else {
+            let battle = self.battle_on();
             let root = &mut self.menu.cards[ROOTCARD];
             root.items[4].text = "RETURN TO GAME";
             root.cursor = 4;
+            // a battle can't be saved
+            if battle {
+                root.items[2].flags |= UI_DISABLED;
+            }
         }
         self.usl_set_options_text();
     }
@@ -2267,6 +2492,7 @@ impl Game {
                 self.menu.cards[SOUNDCARD].items.truncate(SOUND_VOLUME_ITEM);
                 self.menu.cards[MUSICCARD].items.truncate(MUSIC_MIDI_ITEM);
                 self.menu.cards[PADCARD].items.truncate(PAD_PLAYERS_ITEM);
+                self.menu.cards[NEWGAMECARD].items.truncate(NEWGAME_BATTLE_ITEM);
             }
         }
         self.usl_check_saved_games();
@@ -2315,14 +2541,25 @@ impl Game {
     /// USL_HandleComm (0x2b48f)
     fn usl_handle_comm(&mut self, comm: i32) {
         match comm {
-            1 | UC_LOADED => {}
+            1 => {}
+            // (a loaded game is no battle)
+            UC_LOADED => self.battle_stop(),
             UC_ABORT => self.abortgame = true,
             UC_QUIT => self.menu.quit_to_dos = true,
             UC_SEASY..=UC_SHARD => {
                 // a new game has no file to quick save to
                 self.menu.quickslot = None;
+                self.battle_stop();
                 self.restartgame = true;
                 self.restartdifficulty = comm - 4;
+            }
+            UC_BATTLE => {
+                // NewGame starts the battle (battle_begin)
+                self.menu.quickslot = None;
+                self.battle_stop();
+                self.battle.pending = true;
+                self.restartgame = true;
+                self.restartdifficulty = self.battle.difficulty;
             }
             _ => self.quit("USL_HandleComm() - unknown"),
         }
@@ -2419,11 +2656,17 @@ impl Game {
                         self.usl_change_volume(if ls == SC_RIGHTARROW { 10 } else { -10 });
                         resetitem = true;
                     }
-                    // load card: left / right switch the page
-                    SC_LEFTARROW | SC_RIGHTARROW if self.cp_top() == LOADCARD && !self.opts.classic => {
-                        let p = (ls == SC_RIGHTARROW) as usize;
-                        if p != self.menu.load_page {
-                            self.usl_load_set_page(p, 0);
+                    // battle cards: left / right change the level / time
+                    SC_LEFTARROW | SC_RIGHTARROW if matches!(self.cp_top(), BATTLELEVELCARD | BATTLETIMECARD) => {
+                        self.usl_battle_change(if ls == SC_RIGHTARROW { 1 } else { -1 });
+                        resetitem = true;
+                    }
+                    // cards with pages: left / right switch the page
+                    SC_LEFTARROW | SC_RIGHTARROW if self.cp_pages(self.cp_top()) > 1 => {
+                        let pages = self.cp_pages(self.cp_top());
+                        let p = if ls == SC_RIGHTARROW { (self.menu.page + 1).min(pages - 1) } else { self.menu.page.saturating_sub(1) };
+                        if p != self.menu.page {
+                            self.usl_set_page(p, 0);
                         }
                         resetitem = true;
                     }
@@ -2639,6 +2882,18 @@ impl Game {
 
     /// SaveTheGame to a file.
     fn save_game_path(&mut self, path: &std::path::Path, name: &str) -> Result<(), String> {
+        let data = self.save_game_bytes(name);
+        if let Some(d) = path.parent() {
+            std::fs::create_dir_all(d).map_err(|e| io_error_text(&e))?;
+        }
+        // write a temporary file first: a crash never leaves half a save
+        let tmp = path.with_extension("tmp");
+        std::fs::write(&tmp, &data).map_err(|e| io_error_text(&e))?;
+        std::fs::rename(&tmp, path).map_err(|e| io_error_text(&e))
+    }
+
+    /// SaveTheGame into memory (the contents of a saved game file).
+    fn save_game_bytes(&mut self, name: &str) -> Vec<u8> {
         self.gs.riding = None;
         let mut w = Writer(Vec::new());
         w.0.extend_from_slice(SAVEMAGIC);
@@ -2699,13 +2954,7 @@ impl Game {
                 w.u16(self.mp.person[k] as u16);
             }
         }
-        if let Some(d) = path.parent() {
-            std::fs::create_dir_all(d).map_err(|e| io_error_text(&e))?;
-        }
-        // write a temporary file first: a crash never leaves half a save
-        let tmp = path.with_extension("tmp");
-        std::fs::write(&tmp, &w.0).map_err(|e| io_error_text(&e))?;
-        std::fs::rename(&tmp, path).map_err(|e| io_error_text(&e))
+        w.0
     }
 
     fn parse_saved_game(&self, d: &[u8]) -> Result<LoadedGame, String> {
@@ -2818,7 +3067,12 @@ impl Game {
     /// LoadTheGame from a file.
     fn load_game_path(&mut self, path: &std::path::Path) -> Result<(), String> {
         let d = std::fs::read(path).map_err(|e| io_error_text(&e))?;
-        let l = self.parse_saved_game(&d)?;
+        self.load_game_bytes(&d)
+    }
+
+    /// LoadTheGame from the contents of a saved game file.
+    fn load_game_bytes(&mut self, d: &[u8]) -> Result<(), String> {
+        let l = self.parse_saved_game(d)?;
         // Keen 5 keeps the current numfuses (K5 LoadTheGame 0x15db4)
         let numfuses = self.gs.numfuses;
         self.gs = l.gs;
@@ -2969,7 +3223,7 @@ impl Game {
     /// Autosave is on unless --no-auto-save, not with --level (a test run
     /// of a map) and not in demos.
     fn autosave_enabled(&self) -> bool {
-        !self.opts.no_auto_save && self.opts.start_level.is_none() && !self.storedemo && self.demomode == 0
+        !self.opts.no_auto_save && self.opts.start_level.is_none() && !self.storedemo && self.demomode == 0 && !self.battle_on()
     }
 
     /// Saves the running game to AUTOSAVE.CKn without a message. The
