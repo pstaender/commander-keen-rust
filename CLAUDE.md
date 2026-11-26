@@ -28,6 +28,8 @@ runtime and are never committed.
   Headless: `KEEN_PAD=1` pretends a gamepad is connected;
   `KEEN_PAD_DEBUG=1` prints the pads and their events. gilrs runs without
   its default filters (they drop d-pad axes that don't reach exactly ±1).
+  `procon.rs` (macOS): Switch Pro Controller read via hidapi (report
+  0x30; gilrs misreads it), its gilrs pad is left out (`PadView`).
 - `src/game/` – the shared CK_* modules, ported function by function from
   the decompilation. Like the original source (one set of files with
   `#ifdef`s) they are compiled once per episode module (`src/ckN/mod.rs`

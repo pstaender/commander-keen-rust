@@ -161,6 +161,12 @@ well: their d-pad/stick moves, in the menus the four face buttons select
 and the others go back, and every button can be bound as above. If a pad
 does not react, `KEEN_PAD_DEBUG=1` prints what it sends.
 
+Nintendo Switch Pro Controller on macOS: macOS puts it into a report mode
+the gamepad library misreads (buttons seemingly pressed all the time), so
+the game reads it with its own driver (`src/engine/procon.rs`, USB or
+Bluetooth). Its buttons count by position like on the other pads: B is A
+(bottom), A is B (right), Y is X (left), X is Y (top).
+
 ### Multiplayer
 
 Up to four players, each with his own Keen in the levels. Choose the number

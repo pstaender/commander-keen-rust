@@ -15,3 +15,15 @@
   of a loaded game showed what lies beyond them (Keen 6 world map, row
   69). `restore_scroll_blocks` re-adds them after loading (not with
   --classic).
+
+## Switch Pro Controller driver (macOS)
+- With a Pro Controller (USB, 057e:2009) next to the SNES pads, wrong
+  buttons fired constantly: macOS switches it to Nintendo's full report
+  mode 0x30, which gilrs parses with the HID descriptor, so the report's
+  timer byte showed up as buttons 1-8 (binary counter pattern in
+  KEEN_PAD_DEBUG). `src/engine/procon.rs` reads it with hidapi (macOS
+  only, non-exclusive: feature macos-shared-device), decodes 0x30
+  (positional buttons like SDL, 12-bit sticks), sends the SDL handshake /
+  set-mode subcommand if no 0x30 report arrives. `sync_pad` works on
+  `PadView` (gilrs pad or Pro state); gilrs' Pro pads and their events are
+  skipped while the driver has one open.
