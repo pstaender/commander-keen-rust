@@ -33,15 +33,32 @@ MIDI MUSIC. On macOS the apps are not notarized: open them the first time with r
 click > Open. Saves of the bundled Keen 4 go to
 `~/Library/Application Support/Commander Keen/KEEN4`.
 
-## Additonial features
+## Additional features
 
-Play in widescreen mode:
+### Free Aspect Ratio
 
 <img width="1840" height="864" alt="widescreen" src="https://github.com/user-attachments/assets/7a850433-dee2-4e36-bdd2-6334ec218613" />
 
-Adding additional lives and armor, unlimited lives and ammo (the score box then leaves those counters empty), zoom out the play field (see [Zoom](#zoom)), choose the number of players (see [Multiplayer](#multiplayer)) and replay completed levels with the extended options (EXTENDED OPTIONS in the main menu, which also holds END GAME; the options are remembered in `config.txt`; off with `--classic`):
+Adding additional lives and armor, unlimited lives and ammo (the score box then leaves those counters empty), zoom out the play field (see [Zoom](#zoom)), choose the number of players (see [Multiplayer](#multiplayer)) and replay completed levels with the extended options (EXTENDED OPTIONS
+ in the main menu, which also holds END GAME; the options are remembered in `config.txt`; off with `--classic`):
 
-<img width="1072" height="864" alt="cheat_options" src="https://github.com/user-attachments/assets/ac6dac4f-fc06-4eba-93f7-c414dfdfd283" />
+### Multiplayer (up to 4 players)
+
+<img width="1470" height="923" src="https://github.com/user-attachments/assets/087c2fdf-1cec-46f8-8355-31f3dc8c894f" />
+
+### Battle Mode
+
+<img width="1470" height="923" src="https://github.com/user-attachments/assets/30364e28-8e5c-494d-b4e3-6028100c371e" />
+
+<img height="120" alt="keens" src="https://github.com/user-attachments/assets/2b194d91-ff54-487a-80dc-d93707630ae4" />
+<img height="120" alt="four_keens6" src="https://github.com/user-attachments/assets/733fcd88-f877-4354-9664-ba9b4bc6b98a" />
+
+
+### Unlimited Lives and Armor
+
+<img width="1470" height="923" src="https://github.com/user-attachments/assets/501fef6d-af50-4f56-81bc-cd51760c542e" />
+
+### Level Editor
 
 View all maps and levels, edit existing levels or create new ones with the editor:
 
