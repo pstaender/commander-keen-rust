@@ -331,8 +331,14 @@ impl Game {
                     return;
                 }
                 // Keen 4 clears the keys after every level (0x16638), Keen 5
-                // the keys and the keycard unless a game was loaded (0x1697c)
-                ep4! { self.gs.keys = [0; 4]; }
+                // the keys and the keycard unless a game was loaded (0x1697c).
+                // (Keen 4 also clears the gems of a game just loaded; not
+                // in extended mode, like Keen 5.)
+                ep4! {
+                    if self.playstate != EX_LOADEDGAME || self.opts.classic {
+                        self.gs.keys = [0; 4];
+                    }
+                }
                 ep5! {
                     if self.playstate != EX_LOADEDGAME {
                         self.gs.keys = [0; 4];
