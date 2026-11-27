@@ -892,7 +892,11 @@ enum PadView<'a> {
 use super::procon::ProState;
 /// (elsewhere the kernel / gilrs handle the Pro Controller)
 #[cfg(not(target_os = "macos"))]
-type ProState = [f32; 0];
+#[allow(dead_code)]
+struct ProState {
+    buttons: [bool; 0],
+    axes: [f32; 2],
+}
 
 /// A Nintendo Switch Pro Controller (read by `procon.rs` on macOS).
 fn is_procon(pad: &gilrs::Gamepad) -> bool {
