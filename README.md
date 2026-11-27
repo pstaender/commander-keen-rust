@@ -362,6 +362,8 @@ Missing files fall back to the original graphics. The game logic still runs at
 320×200 logical coordinates. Rendering happens at the pack scale, so a
 `scale=4` pack renders at 1280×800.
 
+<img width="233" height="262" alt="Keen nowadays has a laptop" src="https://github.com/user-attachments/assets/228dfb1a-384e-4d73-bb12-80ca4da94a20" />
+
 Example: `packs/keen-laptop` (`scale=1`, sprites 26–34) replaces the book in
 Keen's idle animation (he sits down and reads when left alone) with a black
 laptop. The sprites are the same in all three episodes, so the pack works
