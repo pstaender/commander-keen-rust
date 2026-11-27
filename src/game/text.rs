@@ -104,13 +104,25 @@ Keys, gems and lives are shared (you start with three lives for each player), sh
 {D}{H}MULTIPLAYER (cont'd.)
 {B}
 
-Careful where you aim: a stunner shot makes another Keen dizzy for two seconds. He falls off his pogo stick, sits down and sees stars.
+Careful where you aim: a stunner shot makes another Keen dizzy for two seconds. He falls off his pogo stick, sits down and sees stars. Hit the leading Keen, and the view follows you.
 
 When the leading Keen dies, the next one plays on, and the view follows him. The fallen Keen comes back for one of the lives. If there are none left, he waits for the next level.
 ^P
+{D}{H}BATTLE
+{B}
+New Game has a Battle: two to four players play one level against each other. Choose the players, how hard it is, the level (or a random one) and the time with the left and right arrow keys.
+
+Collect items and stun monsters for points. Items come back after ten seconds. On Easy there are no monsters, on Hard they wake up again after five seconds.
+^P
+{D}{H}BATTLE (cont'd.)
+{B}
+Nobody can leave the level, not even through a door. A shot at another Keen knocks him out for a moment, and if the screen was following him, it follows you now.
+
+The score boxes count how often each Keen was knocked out (0, -1, -2...), and the clock at the top shows the time left. When it runs out, the high score screen shows everybody's knock-outs and score.
+^P
 {D}{H}EXTENDED OPTIONS
 {B}
-The main menu of the ComputerWrist has Extended Options. There you can add lives and shots, play with unlimited lives or shots, enter finished levels again, show the inventory, zoom out and choose the number of players. End Game is there, too. Keen remembers your choices.
+The main menu of the ComputerWrist has Extended Options, on two pages (the arrow keys turn them). On the first you can show the inventory, zoom out, choose the number of players, play with unlimited lives or shots and enter finished levels again; on the second add lives and shots and look at The Keenest (the high scores, quietly, until you press a key), even in the middle of a game. End Game is there, too. Keen remembers your choices.
 
 The inventory at the bottom right shows the gems and other items you are carrying.
 ^P

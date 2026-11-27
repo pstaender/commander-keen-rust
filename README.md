@@ -39,8 +39,7 @@ click > Open. Saves of the bundled Keen 4 go to
 
 <img width="1840" height="864" alt="widescreen" src="https://github.com/user-attachments/assets/7a850433-dee2-4e36-bdd2-6334ec218613" />
 
-Adding additional lives and armor, unlimited lives and ammo (the score box then leaves those counters empty), zoom out the play field (see [Zoom](#zoom)), choose the number of players (see [Multiplayer](#multiplayer)) and replay completed levels with the extended options (EXTENDED OPTIONS
- in the main menu, which also holds END GAME; the options are remembered in `config.txt`; off with `--classic`):
+Adding additional lives and armor, unlimited lives and ammo (the score box then leaves those counters empty), zoom out the play field (see [Zoom](#zoom)), choose the number of players (see [Multiplayer](#multiplayer)) and replay completed levels with the extended options (EXTENDED OPTIONS in the main menu, two pages of the OPTIONS MENU turned with the arrow keys like LOAD GAME, the first with SHOW INVENTORY, ZOOM, PLAYERS, UNLIMITED LIVES, UNLIMITED AMMO and ALLOW RE-ENTER; they also hold THE KEENEST – the game's high score screen, also in the middle of a game, shown without Keen and the monsters until a key is pressed, like the results after a battle – and END GAME; the options are remembered in `config.txt`; off with `--classic`):
 
 ### Multiplayer (up to 4 players)
 
@@ -178,6 +177,12 @@ well: their d-pad/stick moves, in the menus the four face buttons select
 and the others go back, and every button can be bound as above. If a pad
 does not react, `KEEN_PAD_DEBUG=1` prints what it sends.
 
+Nintendo Switch Pro Controller on macOS: macOS puts it into a report mode
+the gamepad library misreads (buttons seemingly pressed all the time), so
+the game reads it with its own driver (`src/engine/procon.rs`, USB or
+Bluetooth). Its buttons count by position like on the other pads: B is A
+(bottom), A is B (right), Y is X (left), X is Y (top).
+
 ### Multiplayer
 
 Up to four players, each with his own Keen in the levels. Choose the number
@@ -202,10 +207,36 @@ one without a gamepad with the keyboard:
   Keen comes back for one of the shared lives (a new game starts with three
   lives per player).
 - Keys, gems and lives are shared, shots found go to everybody, each Keen
-  keeps his own score. A stunner shot makes another Keen dizzy.
+  keeps his own score. A stunner shot makes another Keen dizzy; when it
+  hits the leading Keen, the one who fired takes the lead (the view
+  follows him).
 - On the world map only the leading player walks; the others follow him.
 - Changing the number in the middle of a level applies at once. Not in
   demos and not with `--classic`.
+
+### Battle
+
+NEW GAME > BATTLE: two to four players play one level against each other
+for a set time (the gamepads as for multiplayer). The menu takes you through
+the steps: the number of players, the difficulty, the level (RANDOM or one
+of the levels, left / right arrow keys) and the time (1 to 30 minutes, 5 by
+default, left / right).
+
+- **Points** for bonus items (they come back 10 seconds after they were
+  taken) and for stunning monsters (200). Shots found are only yours.
+- **Easy:** no monsters. **Normal:** monsters you stun stay stunned.
+  **Hard:** stunned monsters wake up again after 5 seconds.
+- **Knock-outs:** a stunner shot that hits another Keen makes him dizzy;
+  his score box counts it where the lives are shown (0, -1, -2, ...).
+  While he is dizzy, more hits don't count. If
+  the screen was following him, it follows the one who fired now.
+- Nobody leaves the level: doors and exits are closed, the objects that
+  would end the level are gone. A Keen who dies comes back at once.
+- The time left is shown at the top (MM:SS, the last 10 seconds blink).
+- When the time is up, the high score screen shows the results: each
+  Keen's helmet in his colors, how often he was knocked out ("3x knocked
+  out") and his score, the best first.
+- Always played at 50 % zoom, can't be saved. Not with `--classic`.
 
 ### Saves and settings
 

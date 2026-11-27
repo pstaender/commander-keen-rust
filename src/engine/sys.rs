@@ -173,6 +173,10 @@ pub struct Sys {
     /// the codes of those axes and the (x, y) direction per pad
     pad_dpad_codes: std::collections::HashSet<u32>,
     pad_dpad: std::collections::HashMap<usize, [i8; 2]>,
+    /// Pro Controllers, read with their own driver (their gilrs pads are
+    /// left out, see `procon.rs`)
+    #[cfg(target_os = "macos")]
+    procon: super::procon::ProPads,
     pub surface: Surface,
     pub palette: Palette,
     pub border: u8,
@@ -248,6 +252,8 @@ impl Sys {
             pad_debug: std::env::var("KEEN_PAD_DEBUG").is_ok_and(|v| v == "1"),
             pad_dpad_codes: Default::default(),
             pad_dpad: Default::default(),
+            #[cfg(target_os = "macos")]
+            procon: Default::default(),
             surface,
             palette: Palette::default(),
             border: 0,
@@ -427,7 +433,14 @@ impl Sys {
         // raw buttons of unmapped pads pressed in this poll
         let (mut raw_face, mut raw_other) = (false, false);
         let mut select = false;
+        #[cfg(target_os = "macos")]
+        let own_driver = !self.procon.pads.is_empty();
+        #[cfg(not(target_os = "macos"))]
+        let own_driver = false;
         while let Some(ev) = g.next_event() {
+            if own_driver && is_procon(&g.gamepad(ev.id)) {
+                continue;
+            }
             if self.pad_debug {
                 let pad = g.gamepad(ev.id);
                 eprintln!("pad {} \"{}\" ({:?} mapping): {:?}", usize::from(ev.id), pad.name(), pad.mapping_source(), ev.event);
@@ -497,8 +510,32 @@ impl Sys {
                 _ => {}
             }
         }
-        i.pad_connected = g.gamepads().next().is_some();
-        i.pad_count = g.gamepads().count();
+        // Pro Controllers: their own driver
+        #[cfg(target_os = "macos")]
+        let pro_states: Vec<super::procon::ProState> = {
+            let wanted = g.gamepads().filter(|(_, p)| is_procon(p)).count();
+            self.procon.update(wanted, self.pad_debug);
+            let debug = self.pad_debug;
+            self.procon.pads.retain_mut(|p| match p.poll(debug) {
+                Some(ev) => {
+                    captured = captured.or(ev.first().copied());
+                    true
+                }
+                None => false,
+            });
+            self.procon.pads.iter().map(|p| p.state).collect()
+        };
+        #[cfg(not(target_os = "macos"))]
+        let pro_states: Vec<ProState> = Vec::new();
+        let own_driver = !pro_states.is_empty();
+        let views: Vec<(usize, PadView)> = g
+            .gamepads()
+            .filter(|(_, p)| !(own_driver && is_procon(p)))
+            .map(|(id, p)| (usize::from(id), PadView::Gilrs(p)))
+            .chain(pro_states.iter().map(|s| (usize::MAX, PadView::Pro(s))))
+            .collect();
+        i.pad_connected = !views.is_empty();
+        i.pad_count = views.len();
         // (gamepads may show up a moment after the start: connect events)
         if i.pad_count >= 2 && !self.pads_seen_at_start && self.start.elapsed() < std::time::Duration::from_secs(5) {
             self.pads_seen_at_start = true;
@@ -507,21 +544,26 @@ impl Sys {
         let mut act = [false; PAD_ACTIONS];
         // multiplayer: the actions of each pad
         let mut per_pad = [[false; PAD_ACTIONS]; 4];
-        for (n, (id, pad)) in g.gamepads().enumerate() {
-            let dpad = self.pad_dpad.get(&usize::from(id)).copied().unwrap_or_default();
+        for (n, (id, view)) in views.iter().enumerate() {
+            let dpad = self.pad_dpad.get(id).copied().unwrap_or_default();
             let mut a = [false; PAD_ACTIONS];
             for (k, &b) in i.pad_map.iter().enumerate() {
-                a[k] |= pad_active(&pad, b, dpad, &self.pad_dpad_codes);
+                a[k] |= pad_active(view, b, dpad, &self.pad_dpad_codes);
             }
-            let (ax, ay) = if pad.mapping_source() == MappingSource::None {
+            let (ax, ay) = if let PadView::Pro(s) = view {
+                (s.axes[0], s.axes[1])
+            } else if matches!(view, PadView::Gilrs(p) if p.mapping_source() == MappingSource::None) {
+                let PadView::Gilrs(pad) = view else { unreachable!() };
                 // unmapped: the raw X/Y axes or the hat switch (HID: down
                 // is positive)
                 let raw = |c: u32| raw_axis(&pad, c);
                 let x = if raw(HID_X) != 0.0 { raw(HID_X) } else { raw(HID_HAT_X) };
                 let y = if raw(HID_Y) != 0.0 { raw(HID_Y) } else { raw(HID_HAT_Y) };
                 (x, -y)
-            } else {
+            } else if let PadView::Gilrs(pad) = view {
                 (pad.value(Axis::LeftStickX), pad.value(Axis::LeftStickY))
+            } else {
+                (0.0, 0.0)
             };
             a[PAD_LEFT] |= ax < -0.5;
             a[PAD_RIGHT] |= ax > 0.5;
@@ -648,6 +690,12 @@ impl Sys {
         crate::dump::write_png(path, s.w, s.h, &rgba)
     }
 
+    /// Tests: presses key `sc` `after` frames from now (like KEEN_KEYS).
+    #[cfg(test)]
+    pub fn script_key(&mut self, after: u64, sc: u8) {
+        self.script.push((self.frame + after, sc, 3));
+    }
+
     /// Saves debugging screenshots (of what the window would show).
     fn debug_frame(&mut self, identity: bool) {
         self.frame += 1;
@@ -768,12 +816,24 @@ fn dpad_axis(c: u32) -> bool {
 /// is an axis pair mapped as buttons, the (x, y) direction `dpad` tracked
 /// from its events.
 fn pad_active(
-    pad: &gilrs::Gamepad,
+    view: &PadView,
     b: super::input::PadInput,
     dpad: [i8; 2],
     dpad_codes: &std::collections::HashSet<u32>,
 ) -> bool {
     use super::input::PadInput;
+    let pad = match view {
+        PadView::Gilrs(p) => p,
+        PadView::Pro(s) => {
+            let v = |c: u8| s.axes.get(c as usize).copied().unwrap_or(0.0);
+            return match b {
+                PadInput::Button(c) => s.buttons.get(c as usize).copied().unwrap_or(false),
+                PadInput::Axis(c, true) => v(c) > 0.5,
+                PadInput::Axis(c, false) => v(c) < -0.5,
+                _ => false,
+            };
+        }
+    };
     match b {
         PadInput::None => false,
         PadInput::Button(c) => {
@@ -819,6 +879,26 @@ fn pad_active(
             }
         }
     }
+}
+
+/// A gamepad as `sync_pad` reads it: through gilrs or, for a Pro
+/// Controller on macOS, its own driver.
+enum PadView<'a> {
+    Gilrs(gilrs::Gamepad<'a>),
+    Pro(&'a ProState),
+}
+
+#[cfg(target_os = "macos")]
+use super::procon::ProState;
+/// (elsewhere the kernel / gilrs handle the Pro Controller)
+#[cfg(not(target_os = "macos"))]
+type ProState = [f32; 0];
+
+/// A Nintendo Switch Pro Controller (read by `procon.rs` on macOS).
+fn is_procon(pad: &gilrs::Gamepad) -> bool {
+    cfg!(target_os = "macos")
+        && pad.vendor_id() == Some(0x057e)
+        && pad.product_id() == Some(0x2009)
 }
 
 /// The value of an axis by its platform code (0 if the pad has none).

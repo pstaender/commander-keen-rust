@@ -16,7 +16,8 @@
 //! original code runs unchanged for every Keen. Keys, gems, lives, drops
 //! and the special items stay shared; score and shots are per player (all
 //! get the shots found). Stunner shots stun the other Keens: they are dizzy
-//! for two seconds.
+//! for two seconds; when the leading Keen is hit, the one who fired takes
+//! the lead (the camera follows him).
 //!
 //! When the leading Keen dies while another one is still alive, that one
 //! takes the lead (`mp_handover`): the two Keen objects exchange their
@@ -113,6 +114,9 @@ pub struct MpState {
     /// world map: the direction (dir_* id) of each follower, for his
     /// standing shape
     pub world_dir: [i32; MAXPLAYERS],
+    /// a stunner shot hit the leading Keen: the slot of the Keen who fired,
+    /// he takes the lead (in `mp_tick`)
+    lead_to: Option<usize>,
 }
 
 impl Default for MpState {
@@ -125,6 +129,7 @@ impl Default for MpState {
             person: [0, 1, 2, 3],
             trail: Vec::new(),
             world_dir: [4; MAXPLAYERS],
+            lead_to: None,
         }
     }
 }
@@ -145,7 +150,7 @@ impl Game {
     /// Multiplayer mode can be played: chosen, a gamepad is connected, not
     /// in demos and not with --classic.
     pub fn mp_available(&self) -> bool {
-        self.mp.enabled() && !self.opts.classic && self.demomode == 0 && !self.storedemo && self.sys.input.pad_connected
+        (self.mp.enabled() || self.battle.active) && !self.opts.classic && self.demomode == 0 && !self.storedemo && self.sys.input.pad_connected
     }
 
     /// Number of players playing: as chosen, but at most one more than
@@ -154,7 +159,9 @@ impl Game {
         if !self.mp_available() {
             return 1;
         }
-        self.mp.players.min(self.sys.input.pad_count.max(1) + 1).clamp(2, MAXPLAYERS)
+        // (a battle has its own number of players)
+        let n = if self.battle.active { self.battle.players } else { self.mp.players };
+        n.min(self.sys.input.pad_count.max(1) + 1).clamp(2, MAXPLAYERS)
     }
 
     /// The next number of players in the menus: 1, 2, ... as many as the
@@ -427,10 +434,11 @@ impl Game {
         (self.mp_in_level() || self.mp.cur != 0) && self.mp.dizzy[self.mp.cur] > 0
     }
 
-    /// Shots found: every player gets them.
+    /// Shots found: every player gets them (in a battle only the one who
+    /// found them).
     pub fn give_ammo(&mut self, n: i32) {
         self.gs.ammo += n;
-        if self.mp_in_level() || self.mp.cur != 0 {
+        if (self.mp_in_level() || self.mp.cur != 0) && !self.battle_on() {
             for k in 1..MAXPLAYERS {
                 if k == self.mp.cur || self.mp_slot_active(k) || self.mp.slots[k].out {
                     self.mp.slots[k].vars.ammo += n;
@@ -461,9 +469,40 @@ impl Game {
             return false;
         }
         self.explode_shot(hit);
+        // already dizzy: the shot only bursts (no knock-out, no new lead)
+        if self.mp.dizzy[k] > 0 {
+            return true;
+        }
         self.mp.dizzy[k] = DIZZYTICS;
         self.play_sound(super::keen::SND_HELMETHIT);
         self.mp_knock_off_pogo(k, ob);
+        self.battle_strike(k);
+        // the leading Keen was hit: the one who fired takes the lead
+        if k == 0 {
+            self.mp.lead_to = self.mp.person.iter().position(|&p| p + 1 == owner).filter(|&s| s != 0);
+        }
+        true
+    }
+
+    /// The Keen who hit the leading one takes the lead (if both are still
+    /// alive), like when the leading Keen dies.
+    fn mp_take_lead(&mut self) {
+        let Some(k) = self.mp.lead_to.take() else { return };
+        if self.mp.cur != 0 || self.keen_dying() {
+            return;
+        }
+        let Some(o) = self.mp.slots[k].obj else { return };
+        if self.keen_obj_dying(o) || self.objs[o].obclass != KEENOBJ {
+            return;
+        }
+        self.mp_handover_to(k);
+    }
+
+    /// Battle: the leading Keen died; another living one takes the lead and
+    /// the dead one comes back. False if nobody else is alive.
+    pub fn mp_battle_handover(&mut self) -> bool {
+        let Some(k) = self.mp_handover(true) else { return false };
+        self.mp_slot_died(k);
         true
     }
 
@@ -480,6 +519,7 @@ impl Game {
         }
         self.mp.dizzy = [0; MAXPLAYERS];
         self.mp.trail.clear();
+        self.mp.lead_to = None;
     }
 
     /// After ScanInfoPlane: the other players start where player 1 does
@@ -632,7 +672,8 @@ impl Game {
         let Some(n) = self.mp.slots[k].obj.take() else { return };
         self.remove_obj(n);
         self.mp.dizzy[k] = 0;
-        let unlimited = self.unlimited_lives();
+        // (a battle: everybody comes back)
+        let unlimited = self.unlimited_lives() || self.battle_on();
         let s = &mut self.mp.slots[k];
         s.vars.riding = None;
         if unlimited {
@@ -706,6 +747,7 @@ impl Game {
     /// coming back after dying, dizziness.
     pub fn mp_tick(&mut self) {
         self.mp_apply_mode();
+        self.mp_take_lead();
         // the leading Keen dies: another one goes on
         if self.mp.cur == 0 && !self.mp_extra_objs().is_empty() && self.keen_dying() {
             self.mp_handover(false);
@@ -736,6 +778,11 @@ impl Game {
             let dying = self.keen_obj_dying(ob);
             let right = if c.wide() { (self.mapwidth - 2) * 256 } else { c.originxmax + 0x1400 };
             if !dying && ((o.left as u16) < c.originxmin as u16 || (right as u16) < o.right as u16) {
+                if self.battle_on() {
+                    // (nobody leaves a battle)
+                    self.battle_keep_in(ob, right);
+                    continue;
+                }
                 self.playstate = EX_COMPLETED;
             } else if !dying && (self.fall_line() as u16) < o.bottom as u16 {
                 self.objs[ob].y -= o.bottom - self.fall_line();
@@ -1234,6 +1281,13 @@ mod tests {
         assert!(!g.jumpbutton);
         // player 2 (keyboard with one gamepad) is not dizzy
         assert!(g.mp.slots[1].vars.jumpbutton);
+        // he hit the leading Keen: he takes the lead, the camera follows him
+        g.tics = 1;
+        g.mp_tick();
+        assert_eq!(g.mp.person, [1, 0, 2, 3]);
+        assert!(g.mp.dizzy[1] > 0 && g.mp.dizzy[0] == 0);
+        // his own Keen object is still the first one (the camera's)
+        assert_eq!(g.player, p1);
         let _ = p2;
         let _ = std::fs::remove_dir_all(&tmp);
     }

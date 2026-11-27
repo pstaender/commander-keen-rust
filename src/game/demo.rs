@@ -47,6 +47,10 @@ pub struct DemoState {
     pub scorescreenkludge: bool,
     /// camera origin when DrawHighScores drew into the master screen
     hs_origin: (i32, i32),
+    /// the high score screen is shown from the control panel: a key
+    /// pressed ends it without opening the panel again (not in the
+    /// original)
+    pub no_panel: bool,
 }
 
 impl Default for DemoState {
@@ -58,6 +62,7 @@ impl Default for DemoState {
             scores_changed: false,
             scorescreenkludge: false,
             hs_origin: (0, 0),
+            no_panel: false,
         }
     }
 }
@@ -1449,6 +1454,10 @@ impl Game {
         if self.sys.input.last_scan == 0 || !self.alive() {
             return;
         }
+        if self.demo.no_panel {
+            self.sys.input.clear_keys_down();
+            return;
+        }
         // Keen 4/5: F1 shows the help screens instead of the control panel
         // (Keen 4 checks storedemo first, Keen 5 afterwards)
         if super::EPISODE != 6 && !self.storedemo && self.sys.input.last_scan == SC_F1 {
@@ -1515,7 +1524,11 @@ impl Game {
             if self.demo.scorescreenkludge {
                 self.draw_high_scores();
             }
-            self.play_loop();
+            if self.high_scores_shown() {
+                self.high_scores_still();
+            } else {
+                self.play_loop();
+            }
         }
         // IN_StopDemo
         self.demomode = 0;
@@ -1523,6 +1536,28 @@ impl Game {
             self.rf.bg_hook = None;
         }
         self.check_last_scan();
+    }
+
+    /// The high score screen asked for in the menu or after a battle (not
+    /// in the original): the map without Keen, enemies or other sprites,
+    /// its tiles animated, until a key or button is pressed.
+    fn high_scores_still(&mut self) {
+        let mut cur = Some(self.player);
+        while let Some(ob) = cur {
+            self.remove_sprite(ob);
+            cur = self.objs[ob].next;
+        }
+        self.start_music(self.gs.mapon);
+        self.tics = 3;
+        self.lasttimecount = 3;
+        self.sys.set_time_count(3);
+        while self.alive() {
+            self.rf_refresh();
+            if !self.screenfaded && self.demo_user_input() {
+                break;
+            }
+        }
+        self.stop_music();
     }
 
     /// ShowHighScores (0x157d6)
@@ -1547,6 +1582,10 @@ impl Game {
     fn draw_high_scores_text(&mut self) {
         let dx = (self.demo.hs_origin.0 - self.cam.originxglobal) >> 4;
         let dy = (self.demo.hs_origin.1 - self.cam.originyglobal) >> 4;
+        if let Some(r) = self.battle.results.clone() {
+            self.draw_battle_results(&r, dx, dy);
+            return;
+        }
         if super::EPISODE == 5 {
             self.tw.fontcolor = HS_COLOR;
         }
@@ -1575,6 +1614,58 @@ impl Game {
             self.tw.printx += w;
         }
         self.tw.fontcolor = 15;
+    }
+
+    /// Battle mode: the results in place of the high score table, one line
+    /// per Keen, the best first: his helmet in his colors, how often he was
+    /// knocked out and his score.
+    fn draw_battle_results(&mut self, rows: &[super::battle::BattleResult], dx: i32, dy: i32) {
+        if super::EPISODE == 5 {
+            self.tw.fontcolor = HS_COLOR;
+        }
+        for (i, r) in rows.iter().enumerate() {
+            let y = (i as i32) * 0x10 + HS_TOP + dy;
+            let x = HS_NAMEX + dx;
+            if let Some(t) = self.battle_helmet(r.person) {
+                self.sys.surface.blit(&t, x, y - 1);
+            }
+            let text = format!("{}x knocked out", r.knocked);
+            self.tw.printy = y;
+            self.tw.printx = x + 18;
+            self.us_print(&text);
+            let mut digits = r.score.to_string().into_bytes();
+            for c in digits.iter_mut() {
+                *c = c.wrapping_add(0x51);
+            }
+            let (w, _) = self.measure_string(&digits);
+            self.draw_string_at(&digits, HS_SCORERIGHT - w + dx, y);
+        }
+        self.tw.fontcolor = 15;
+    }
+
+    /// Battle mode: the results on the high score screen (like
+    /// ShowHighScores), after the battle.
+    fn show_battle_results(&mut self) {
+        self.show_high_scores();
+        self.battle.results = None;
+    }
+
+    /// The high score screen was asked for (the extended options' HIGH
+    /// SCORES) or shows a battle's results: no DEMO sign, and its loading
+    /// box says "High Scores" (not in the original).
+    pub fn high_scores_shown(&self) -> bool {
+        self.demo.scorescreenkludge && (self.demo.no_panel || self.battle.results.is_some())
+    }
+
+    /// The high score screen from the control panel's extended options
+    /// (not in the original): until a key is pressed, then back.
+    pub fn high_scores_from_menu(&mut self) {
+        // (the key that chose it would end it at once)
+        self.sys.input.clear_keys_down();
+        self.demo.no_panel = true;
+        self.show_high_scores();
+        self.demo.no_panel = false;
+        self.sys.input.clear_keys_down();
     }
 
     /// CheckHighScore (0x1569a): enters a new score into the table and
@@ -1628,7 +1719,12 @@ impl Game {
             if !self.alive() {
                 return;
             }
-            self.show_high_scores();
+            // (battle mode: its results instead of the high scores)
+            if self.battle.results.is_some() {
+                self.show_battle_results();
+            } else {
+                self.show_high_scores();
+            }
             if self.playstate == EX_RESETGAME || self.playstate == EX_LOADEDGAME {
                 continue;
             }

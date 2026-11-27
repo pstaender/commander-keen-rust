@@ -13,6 +13,10 @@ gilrs = "0.11"
 winit = "0.30"
 softbuffer = "0.4"
 
+# Pro Controller driver (src/engine/procon.rs)
+[target.'cfg(target_os = "macos")'.dependencies]
+hidapi = { version = "2.6", default-features = false, features = ["macos-shared-device"] }
+
 [target.'cfg(windows)'.build-dependencies]
 embed-resource = "3.0"
 png = "0.17"

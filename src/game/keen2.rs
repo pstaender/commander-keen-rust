@@ -65,8 +65,11 @@ impl Game {
     fn draw_score_box_at(&mut self) {
         let scale = self.sys.surface.scale as i32;
         if self.demomode != 0 {
-            // DEMO plaque at origin + (0x800,0x80) global units
-            self.draw_overlay_sprite(DEMOPLAQUESPR, 0x80, 0x08, scale);
+            // DEMO plaque at origin + (0x800,0x80) global units (not on the
+            // high score screen asked for in the menu or after a battle)
+            if !self.high_scores_shown() {
+                self.draw_overlay_sprite(DEMOPLAQUESPR, 0x80, 0x08, scale);
+            }
             return;
         }
         // the inventory (not in the original): bottom right, with
@@ -75,6 +78,8 @@ impl Game {
         if self.opts.cheatmode && !self.opts.hide_inventory && !self.opts.classic {
             self.draw_items_box();
         }
+        // battle mode: the time left
+        self.draw_battle_timer();
         if !self.showscorebox {
             return;
         }
@@ -182,6 +187,19 @@ impl Game {
         // empty with the extended options UNLIMITED AMMO / LIVES.
         let a = if self.unlimited_ammo() { String::new() } else if ammo < 100 { ammo.to_string() } else { "99".into() };
         self.draw_score_digits(&a, 2, base_x + 64, base_y + 20);
+        // battle mode: how often he was knocked out, 0, -1, -2, ...
+        if self.battle_on() {
+            let k = self.battle.knocked[n].min(99);
+            self.draw_score_digits(&k.to_string(), 2, base_x + 24, base_y + 20);
+            if k > 0 {
+                // the minus: the middle segment of a digit in its red, in
+                // the left digit (or just before the field from -10 on)
+                let x = if k < 10 { base_x + 24 + 1 } else { base_x + 24 - 4 };
+                let w = if k < 10 { 5 } else { 3 };
+                self.sys.surface.bar(x, base_y + 20 + 3, w, 1, 12);
+            }
+            return;
+        }
         let l = if self.unlimited_lives() {
             String::new()
         } else if self.gs.lives < 100 {

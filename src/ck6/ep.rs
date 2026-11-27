@@ -41,6 +41,20 @@ pub mod obclass {
     pub const MAPFLAGOBJ: i32 = 35;
 }
 
+/// battle mode: classes that aren't monsters (an easy battle removes the
+/// monsters), and the ones that would end the level (always removed)
+pub const BATTLE_KEEP: &[i32] = &[
+    SANDWICHOBJ,
+    HOOKOBJ,
+    PASSCARDOBJ,
+    ROCKETOBJ,
+    GRAPPLEOBJ,
+    SATELLITEOBJ,
+    SATELLITESTOPOBJ,
+    MOLLYOBJ,
+];
+pub const BATTLE_REMOVE: &[i32] = &[SANDWICHOBJ, HOOKOBJ, PASSCARDOBJ, MOLLYOBJ];
+
 /// KeenContact (0x1b5c9)
 pub fn keen_contact(g: &mut Game, ob: usize, hit: usize) {
     match g.objs[hit].obclass {

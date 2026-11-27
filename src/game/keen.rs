@@ -115,6 +115,13 @@ impl Game {
     /// Switches and doors when pressing up (0x1a406, K4 0x1b133); Keen 5
     /// has its own version with the security doors (src/ck5/ep.rs).
     pub fn check_enter_house(&mut self, ob: usize) -> bool {
+        // battle mode: nobody goes through doors (switches still work)
+        if self.battle_on() {
+            let it = ep_sel!(self.up_pressed_tile(ob), self.intile(self.fg_tile(self.objs[ob].tilemidx, self.objs[ob].tiletop)), self.up_pressed_tile(ob));
+            if it == 2 || (super::EPISODE == 5 && it == 0x20) {
+                return false;
+            }
+        }
         ep_sel!(self.check_enter_house_std(ob), super::ep::check_enter_house(self, ob), self.check_enter_house_std(ob))
     }
 
@@ -235,6 +242,7 @@ impl Game {
 
     /// GetBonus from a tile (0x1b796)
     pub fn get_bonus_tile(&mut self, x: i32, y: i32, kind: usize) {
+        self.battle_tile_taken(x, y);
         self.rf_mem_to_map(&[0], 1, x, y, 1, 1);
         self.play_sound(BONUSSOUND[kind]);
         self.give_points(BONUSPOINTS[kind]);
@@ -260,6 +268,7 @@ impl Game {
 
     /// GetDrop / viva (0x1b860)
     pub fn get_drop(&mut self, x: i32, y: i32) {
+        self.battle_tile_taken(x, y);
         self.rf_mem_to_map(&[0], 1, x, y, 1, 1);
         self.play_sound(SND_GETWATER);
         ep_sel!(self.spawn_drop_splash(x, y), super::act1::spawn_splash(self, x, y), self.spawn_drop_splash(x, y));
@@ -1061,7 +1070,12 @@ pub fn keen_contact(g: &mut Game, ob: usize, hit: usize) {
     if g.mp_shot_hits_keen(ob, hit) {
         return;
     }
+    // battle mode: a bonus taken comes back later
+    let before = (g.objs[hit].obclass == BONUSOBJ && g.battle_on()).then(|| g.objs[hit].clone());
     super::ep::keen_contact(g, ob, hit);
+    if let Some(o) = before.filter(|_| g.objs[hit].obclass != BONUSOBJ) {
+        g.battle_bonus_taken(o);
+    }
 }
 
 /// KeenPosContact: while on a pole etc. landing on platform-like objects,
