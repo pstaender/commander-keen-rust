@@ -1337,7 +1337,7 @@ dependencies = [
 
 [[package]]
 name = "keen"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "embed-resource",
  "gilrs",
@@ -1352,7 +1352,7 @@ dependencies = [
 
 [[package]]
 name = "keen-editor"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "eframe",
  "keen",
