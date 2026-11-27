@@ -362,6 +362,15 @@ Missing files fall back to the original graphics. The game logic still runs at
 320×200 logical coordinates. Rendering happens at the pack scale, so a
 `scale=4` pack renders at 1280×800.
 
+Example: `packs/keen-laptop` (`scale=1`, sprites 26–34) replaces the book in
+Keen's idle animation (he sits down and reads when left alone) with a black
+laptop. The sprites are the same in all three episodes, so the pack works
+for each of them:
+
+```
+keen4 --data KEEN4 --gfx-pack packs/keen-laptop
+```
+
 ### Audio replacement: `--audio-pack DIR`
 
 - `DIR/sfx/NN.ogg` (or `.wav`, `.flac`, `.mp3`) replaces sound effect NN
