@@ -188,7 +188,13 @@ runtime and are never committed.
 ## Remastering hooks
 - `--gfx-pack DIR`: same file names as `--dump` output, each image scaled by
   the integer factor in `DIR/pack.txt` (`scale=N`); missing files fall back
-  to the original graphics.
+  to the original graphics. Without it a `gfx-pack` dir next to the executable
+  (or in the app bundle's Resources) is used; `tools/build_with_pack.sh
+  [--windows] [PACK]` downloads the data (`downloads/`) and packages all
+  three episodes with a pack into `dist/<pack>/<os>` (both git-ignored,
+  contain the game data); native build for the host, `--windows` cross
+  (cargo-zigbuild); Linux only on Linux. `.github/workflows/build-pack.yml`
+  (manual) runs it on all three OSes, artifacts only.
 - `--audio-pack DIR`: `sfx/NN.ogg|wav|flac|mp3` replaces sound NN,
   `music/NN.ogg|...|mid` replaces song NN (`--soundfont FILE.sf2` for MIDI);
   `sfx/kN/`, `music/kN/` (N = 4, 5, 6) are per episode and come first.
