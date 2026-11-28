@@ -194,7 +194,8 @@ runtime and are never committed.
   three episodes with a pack into `dist/<pack>/<os>` (both git-ignored,
   contain the game data); native build for the host, `--windows` cross
   (cargo-zigbuild); Linux only on Linux. `.github/workflows/build-pack.yml`
-  (manual) runs it on all three OSes, artifacts only.
+  (manual and on a published release) runs it on all three OSes,
+  artifacts only.
 - `--audio-pack DIR`: `sfx/NN.ogg|wav|flac|mp3` replaces sound NN,
   `music/NN.ogg|...|mid` replaces song NN (`--soundfont FILE.sf2` for MIDI);
   `sfx/kN/`, `music/kN/` (N = 4, 5, 6) are per episode and come first.

@@ -46,3 +46,5 @@
   retention) runs the script on ubuntu/windows/macos, caches downloads/ per
   half year, uploads tar.gz/zip artifacts (contain K5/K6 data: never
   attached to a release).
+- build-pack.yml also runs on a published release (pack defaults to
+  packs/keen-laptop, retention 7 days); still artifacts only.

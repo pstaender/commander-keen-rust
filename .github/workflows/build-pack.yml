@@ -1,7 +1,8 @@
 # Builds keen4, keen5 and keen6 with a graphics pack (default
 # packs/keen-laptop) for Linux, Windows and macOS with
 # tools/build_with_pack.sh, started by hand (Actions > Build with a
-# graphics pack > Run workflow).
+# graphics pack > Run workflow) and with every published release (with
+# packs/keen-laptop).
 #
 # The archives contain the original data of all three episodes (also the
 # commercial Keen 5 and 6), so they are only kept as workflow artifacts
@@ -9,6 +10,8 @@
 name: Build with a graphics pack
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       pack:
@@ -71,13 +74,13 @@ jobs:
 
       - name: Build and package
         env:
-          PACK: ${{ inputs.pack }}
+          PACK: ${{ inputs.pack || 'packs/keen-laptop' }}
         run: tools/build_with_pack.sh "$PACK" dist/pack
 
       - name: Archive
         id: pkg
         env:
-          PACK: ${{ inputs.pack }}
+          PACK: ${{ inputs.pack || 'packs/keen-laptop' }}
         run: |
           name="commander-keen-rust-$(basename "$PACK")-${{ matrix.platform }}"
           mv "dist/pack/${{ matrix.platform }}" "dist/$name"
@@ -94,4 +97,4 @@ jobs:
         with:
           name: ${{ matrix.platform }}
           path: ${{ steps.pkg.outputs.file }}
-          retention-days: ${{ fromJSON(inputs.retention) }}
+          retention-days: ${{ fromJSON(inputs.retention || '7') }}
