@@ -384,8 +384,10 @@ macOS/Linux (needs `zig` and `cargo install cargo-zigbuild`; the .exe files
 then have no icon). The GitHub workflow *Build with a graphics pack*
 (`.github/workflows/build-pack.yml`, started by hand and with every
 published release) runs the script on
-Linux, Windows and macOS and keeps the archives as artifacts for a few days.
-The results contain the commercial episodes' data: keep them to yourself.
+Linux, Windows and macOS, keeps the archives as artifacts for a few days and
+attaches them to the release (`commander-keen-rust-<tag>-keen-laptop-<os>`,
+with the data of all three episodes). The game data is only downloaded for
+the build and never committed (`downloads/` and `dist/` are git-ignored).
 
 ### Audio replacement: `--audio-pack DIR`
 

@@ -48,3 +48,6 @@
   attached to a release).
 - build-pack.yml also runs on a published release (pack defaults to
   packs/keen-laptop, retention 7 days); still artifacts only.
+- build-pack.yml attaches its archives (all three episodes' data) to the
+  release as commander-keen-rust-<tag>-<pack>-<os> (contents: write); the
+  data is still only downloaded at build time, never committed.

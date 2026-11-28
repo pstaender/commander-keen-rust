@@ -4,9 +4,9 @@
 # graphics pack > Run workflow) and with every published release (with
 # packs/keen-laptop).
 #
-# The archives contain the original data of all three episodes (also the
-# commercial Keen 5 and 6), so they are only kept as workflow artifacts
-# for a few days and never attached to a release.
+# The archives contain the original data of all three episodes (also
+# Keen 5 and 6, from archive.org, with permission): kept as workflow
+# artifacts for a few days and, for a release, attached to it.
 name: Build with a graphics pack
 
 on:
@@ -22,6 +22,9 @@ on:
         description: Days to keep the artifacts
         default: "7"
         required: true
+
+permissions:
+  contents: write
 
 env:
   CARGO_TERM_COLOR: always
@@ -98,3 +101,16 @@ jobs:
           name: ${{ matrix.platform }}
           path: ${{ steps.pkg.outputs.file }}
           retention-days: ${{ fromJSON(inputs.retention || '7') }}
+
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          FILE: ${{ steps.pkg.outputs.file }}
+        run: |
+          # versioned like the archives of release.yml
+          dir=$(dirname "$FILE") base=$(basename "$FILE")
+          versioned="$dir/${base/commander-keen-rust-/commander-keen-rust-$TAG-}"
+          mv "$FILE" "$versioned"
+          gh release upload "$TAG" "$versioned" --clobber
