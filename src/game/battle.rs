@@ -153,7 +153,7 @@ impl Game {
         let level = if levels.contains(&b.level) {
             b.level
         } else {
-            let r = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.subsec_nanos()).unwrap_or(0);
+            let r = crate::vfs::now_since_epoch().subsec_nanos();
             levels[(r as usize / 1000) % levels.len()]
         };
         self.gs.mapon = level;

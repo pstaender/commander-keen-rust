@@ -99,7 +99,7 @@ impl Game {
 
     pub fn init_rnd(&mut self, randomize: bool) {
         self.rndindex = if randomize {
-            (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.subsec_millis() / 10).unwrap_or(0)
+            ((crate::vfs::now_since_epoch().subsec_millis() / 10)
                 & 0xff) as usize
         } else {
             0

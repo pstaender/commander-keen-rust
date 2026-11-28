@@ -47,6 +47,25 @@ runtime and are never committed.
   `act1-3.rs` (the episode's actors), `states.rs` (GENERATED with
   `EP=N python3 -I tools/gen_states.py` from the state records in the
   executable; names in `tools/states_kN.py` and `tools/states_kN_<module>.py`).
+- `src/vfs.rs` – the files the game reads/writes (data, saves, config.txt,
+  demos, screenshots): `std::fs` natively, in memory in the browser (filled
+  by the page, changes reported through a hook). Use it, not `std::fs`, in
+  game code; also `vfs::now_since_epoch` (SystemTime panics on wasm) and
+  `Sys::sleep_ms` (no `thread::sleep`).
+- `web/` – browser build (crate `keen-web`, `web/build.sh` runs `wasm-pack
+  build --target web`, output `web/dist`, `web/serve.mjs` (Node.js/Bun) serves it with the
+  COOP/COEP headers). The game runs in a web worker (`www/worker.js`) and
+  blocks there; `src/engine/sys_web.rs` replaces `sys.rs` on wasm32 (same
+  API) and shares SharedArrayBuffers with the page (`www/main.js`): key
+  events (scan codes from `input::KEY_CODES`), gamepad states (Gamepad
+  API: standard mapping = `PadInput::Button` codes, else raw buttons /
+  axes / hat), the frame (RGBA) and a sample ring for the AudioWorklet
+  (`www/audio.js`). Buffer layout constants come from `layout()`. winit,
+  softbuffer, gilrs and rodio are native-only (sound.rs has a small
+  stand-in for rodio on wasm: no sinks, so no audio packs / MIDI).
+  Gamepad actions are applied by `Input::apply_pad` on both platforms.
+  Test in Chrome headless over the DevTools protocol (fake gamepads by
+  replacing `navigator.getGamepads`).
 - `src/cli.rs` – the command line, shared by `src/bin/keen4.rs`,
   `keen5.rs`, `keen6.rs`. Without `--data` the data directory is also
   looked up next to the executable, in `data/` there and in a macOS app
@@ -171,7 +190,8 @@ runtime and are never committed.
 
 ## Build / run
 - `cargo build --release` (game), `cargo build --release --workspace`
-  (game + editor)
+  (game + editor), `web/build.sh [--data KEEN4]` (browser, needs
+  wasm-pack and the wasm32-unknown-unknown target)
 - `./target/release/keen4|keen5|keen6 [--data DIR]` (options: `--help`)
 - Testing without a window: `--headless`, env `KEEN_SHOT_DIR=dir
   KEEN_SHOT_EVERY=n KEEN_MAX_FRAMES=n` saves PNG frames; `--demo N` replays

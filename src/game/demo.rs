@@ -277,7 +277,7 @@ impl Game {
                 return tics;
             }
             if self.sys.headless_time.is_none() {
-                std::thread::sleep(std::time::Duration::from_millis(1));
+                self.sys.sleep_ms(1);
             }
             self.sys.poll();
         }
@@ -1439,7 +1439,7 @@ impl Game {
             out.extend_from_slice(&(self.ca_mapon as u16).to_le_bytes());
             out.extend_from_slice(&(len as u16).to_le_bytes());
             out.extend_from_slice(&self.demo.buffer[..len]);
-            if std::fs::write(self.data.write_dir.join(format!("DEMO{}.{}", n, super::LAYOUT.ext)), out).is_err() {
+            if crate::vfs::write(&self.data.write_dir.join(format!("DEMO{}.{}", n, super::LAYOUT.ext)), &out).is_err() {
                 self.quit("EndDemoRecord:  Cannot write demo file!");
             }
         }

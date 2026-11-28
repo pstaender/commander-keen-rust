@@ -261,6 +261,56 @@ default, left / right).
 - Settings (sound mode, key bindings, gamepad) and high scores are stored in
   `config.txt` in the data directory, so each episode has its own.
 
+## Web browser (WebAssembly)
+
+`web/` builds the game for the browser with
+[wasm-pack](https://rustwasm.github.io/wasm-pack/) (`rustup target add
+wasm32-unknown-unknown`, `cargo install wasm-pack`):
+
+```sh
+web/build.sh                  # wasm-pack build --target web, page in web/dist
+web/build.sh --data KEEN4     # ... with the data files in web/dist/data
+node web/serve.mjs            # http://localhost:8080/ (or: bun web/serve.mjs)
+```
+
+Without `--data` the page asks for the original files (pick the folder or the
+files, or drop them on the page). They are stored in the browser (IndexedDB),
+nothing is uploaded. The episode is detected from the files, Keen 4 is the
+default when several are stored (`?ep=5` picks another). Saved games,
+`config.txt` and the autosave are kept in the browser too; F10+P screenshots
+and recorded demos are downloaded.
+
+- Keyboard as in the game. F11 or a double click switches fullscreen. The
+  browser keeps a few shortcuts for itself (Cmd+… on macOS; Ctrl+W/T/N in
+  Chrome), and on macOS Ctrl+arrow keys may switch Spaces (the desktop
+  version turns that off, a browser can't): rebind jump under CONFIGURE >
+  KEYBOARD or use a gamepad.
+- Gamepads (USB or Bluetooth) through the browser's Gamepad API, up to 4
+  (multiplayer and battle work). Browsers only show a gamepad to a page
+  after one of its buttons was pressed. Pads with the browser's standard
+  mapping (Xbox, PlayStation, Switch Pro, most others in Chrome) use the
+  usual layout; others (e.g. cheap SNES-style USB pads, often in Firefox)
+  move with their first two axes or their hat switch, and their buttons are
+  set up under CONFIGURE > USE GAMEPAD, like unmapped pads in the desktop
+  version. `?paddebug` logs the pads and their buttons/axes to the console.
+- Options go in the URL like the command line: `?classic`,
+  `?zoom=50`, `?level=3&difficulty=hard`, `?nosound`, `?no-aspect`,
+  `?classic-view`, `?no-auto-save`, `?debug`.
+- Not in the browser: MIDI MUSIC (no SoundFont), `--audio-pack` and
+  `--gfx-pack`.
+
+How it works: the game keeps its own loop like the DOS original, so it runs
+in a web worker where it may block (`Atomics.wait`). Picture, keyboard,
+gamepads and sound go through SharedArrayBuffers shared with the page
+(`src/engine/sys_web.rs`, `web/www/main.js`); the sound is the emulated
+AdLib / PC speaker, played by an AudioWorklet. SharedArrayBuffer needs a
+cross-origin isolated page: `web/serve.mjs` (Node.js or Bun, no dependencies) sends the headers
+(`Cross-Origin-Opener-Policy: same-origin`,
+`Cross-Origin-Embedder-Policy: require-corp`); on hosting without them
+(e.g. GitHub Pages) the page installs a service worker (`coi-sw.js`) that
+adds them and reloads once. `web/dist` is a static site, any web server
+(https or localhost) will do.
+
 ## Widescreen
 
 The play field adapts to the shape of the window or screen. The height stays

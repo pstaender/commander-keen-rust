@@ -27,3 +27,38 @@
   set-mode subcommand if no 0x30 report arrives. `sync_pad` works on
   `PadView` (gilrs pad or Pro state); gilrs' Pro pads and their events are
   skipped while the driver has one open.
+
+## Web browser version (WebAssembly)
+- `web/` crate `keen-web` (cdylib, empty except on wasm32), built with
+  `wasm-pack build --target web` by web/build.sh into web/dist (static
+  page: index.html, main.js, worker.js, audio.js, coi-sw.js, pkg/).
+- The game loop blocks like the original, so it runs in a module web
+  worker: `Sys` on wasm32 is src/engine/sys_web.rs (same API), sleeping
+  with Atomics.wait. Page <-> worker through three SharedArrayBuffers
+  (control: key ring, area size, fullscreen, 4 gamepad slots; frame: RGBA
+  with a seqlock counter; audio: stereo ring, wrapping i32 frame
+  counters). Needs cross-origin isolation: serve.mjs (Node.js/Bun) sends COOP/COEP, else
+  coi-sw.js adds them (one reload).
+- Sound: the existing Synth (mono) is pulled by Sys (poll/present/wait)
+  ~70 ms ahead of the AudioWorklet's read position; while the
+  AudioContext is not running (no click yet) it is consumed in real time,
+  so sounds still end. rodio is native-only; sound.rs keeps its code with a
+  stand-in `rodio` module on wasm (uninhabited Sink).
+- Gamepads: navigator.getGamepads() is main-thread only, so the page
+  writes buttons (bit mask) and axes per pad; standard mapping is
+  translated to the PAD_BUTTONS codes, other pads give RawButton(9<<16|n)
+  / RawAxis(n); a hat axis (centered > 1, directions -1..1 in 2/7 steps)
+  is detected per pad. The action logic of sync_pad moved to
+  `Input::apply_pad` (shared with native).
+- Files: src/vfs.rs (std::fs natively; in memory on wasm, filled from the
+  page's IndexedDB, writes posted back). Game code (menu saves/config,
+  data loading, demo recording, write_png) uses it; SystemTime::now and
+  thread::sleep (both panic on wasm32) replaced by vfs::now_since_epoch /
+  Sys::sleep_ms. Keys: `input::KEY_CODES` (W3C code names = winit KeyCode
+  variant names) replaces the winit match.
+- Checked: all 12 original demo traces (K4-6, demos 0-3) identical to the
+  previous build; in Chrome (headless, DevTools protocol): title/menu/map,
+  keyboard, simulated standard and unmapped (hat) gamepads, START opens
+  the menu, audio ring consumed at 44.1 kHz, autosave/config in
+  IndexedDB, file picker path, service worker fallback without headers,
+  help page fits.

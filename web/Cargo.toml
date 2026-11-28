@@ -1,0 +1,20 @@
+[package]
+name = "keen-web"
+version = "0.5.0"
+edition = "2021"
+description = "Commander Keen 4, 5 and 6 in the web browser (WebAssembly, requires the original data files)"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# (the crate is empty except in the browser build)
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+keen = { path = ".." }
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+
+[package.metadata.wasm-pack.profile.release]
+# (wasm-opt from binaryen; the bundled one may not know the newer
+# WebAssembly features rustc emits)
+wasm-opt = ["-O3", "--enable-bulk-memory", "--enable-nontrapping-float-to-int", "--enable-sign-ext", "--enable-mutable-globals"]

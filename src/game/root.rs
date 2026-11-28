@@ -219,7 +219,7 @@ pub fn run(sys: Sys, data: GameData, gfx: Gfx, sd: SoundManager, opts: Options) 
         return;
     }
     if let Some(p) = game.opts.demo_file.clone() {
-        match std::fs::read(&p) {
+        match crate::vfs::read(&p) {
             Ok(d) => game.run_demo_data(&d),
             Err(e) => eprintln!("{}: {}", p.display(), e),
         }

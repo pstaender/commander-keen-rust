@@ -2,7 +2,6 @@
 //! control panel work with scan codes, so key configuration stays compatible
 //! with CONFIG.CK6.
 
-use winit::keyboard::KeyCode;
 
 pub type ScanCode = u8;
 
@@ -68,97 +67,120 @@ pub const SC_X: ScanCode = 0x2d;
 pub const SC_Y: ScanCode = 0x15;
 pub const SC_Z: ScanCode = 0x2c;
 
+/// PC/XT scan codes by key code name (the W3C UI Events `code` values, which
+/// are also the names of winit's `KeyCode` variants).
+pub const KEY_CODES: &[(&str, ScanCode)] = &[
+    ("Escape", 0x01),
+    ("Digit1", 0x02),
+    ("Digit2", 0x03),
+    ("Digit3", 0x04),
+    ("Digit4", 0x05),
+    ("Digit5", 0x06),
+    ("Digit6", 0x07),
+    ("Digit7", 0x08),
+    ("Digit8", 0x09),
+    ("Digit9", 0x0a),
+    ("Digit0", 0x0b),
+    ("Minus", 0x0c),
+    ("Equal", 0x0d),
+    ("Backspace", 0x0e),
+    ("Tab", 0x0f),
+    ("KeyQ", 0x10),
+    ("KeyW", 0x11),
+    ("KeyE", 0x12),
+    ("KeyR", 0x13),
+    ("KeyT", 0x14),
+    ("KeyY", 0x15),
+    ("KeyU", 0x16),
+    ("KeyI", 0x17),
+    ("KeyO", 0x18),
+    ("KeyP", 0x19),
+    ("BracketLeft", 0x1a),
+    ("BracketRight", 0x1b),
+    ("Enter", 0x1c),
+    ("NumpadEnter", 0x1c),
+    ("ControlLeft", 0x1d),
+    ("ControlRight", 0x1d),
+    ("KeyA", 0x1e),
+    ("KeyS", 0x1f),
+    ("KeyD", 0x20),
+    ("KeyF", 0x21),
+    ("KeyG", 0x22),
+    ("KeyH", 0x23),
+    ("KeyJ", 0x24),
+    ("KeyK", 0x25),
+    ("KeyL", 0x26),
+    ("Semicolon", 0x27),
+    ("Quote", 0x28),
+    ("Backquote", 0x29),
+    ("ShiftLeft", 0x2a),
+    ("Backslash", 0x2b),
+    ("IntlBackslash", 0x2b),
+    ("KeyZ", 0x2c),
+    ("KeyX", 0x2d),
+    ("KeyC", 0x2e),
+    ("KeyV", 0x2f),
+    ("KeyB", 0x30),
+    ("KeyN", 0x31),
+    ("KeyM", 0x32),
+    ("Comma", 0x33),
+    ("Period", 0x34),
+    ("Slash", 0x35),
+    ("ShiftRight", 0x36),
+    ("NumpadMultiply", 0x37),
+    ("AltLeft", 0x38),
+    ("AltRight", 0x38),
+    ("Space", 0x39),
+    ("CapsLock", 0x3a),
+    ("F1", 0x3b),
+    ("F2", 0x3c),
+    ("F3", 0x3d),
+    ("F4", 0x3e),
+    ("F5", 0x3f),
+    ("F6", 0x40),
+    ("F7", 0x41),
+    ("F8", 0x42),
+    ("F9", 0x43),
+    ("F10", 0x44),
+    ("NumLock", 0x45),
+    ("ScrollLock", 0x46),
+    ("Home", 0x47),
+    ("Numpad7", 0x47),
+    ("ArrowUp", 0x48),
+    ("Numpad8", 0x48),
+    ("PageUp", 0x49),
+    ("Numpad9", 0x49),
+    ("NumpadSubtract", 0x4a),
+    ("ArrowLeft", 0x4b),
+    ("Numpad4", 0x4b),
+    ("Numpad5", 0x4c),
+    ("ArrowRight", 0x4d),
+    ("Numpad6", 0x4d),
+    ("NumpadAdd", 0x4e),
+    ("End", 0x4f),
+    ("Numpad1", 0x4f),
+    ("ArrowDown", 0x50),
+    ("Numpad2", 0x50),
+    ("PageDown", 0x51),
+    ("Numpad3", 0x51),
+    ("Insert", 0x52),
+    ("Numpad0", 0x52),
+    ("Delete", 0x53),
+    ("NumpadDecimal", 0x53),
+    ("F11", 0x57),
+    ("F12", 0x58),
+];
+
+/// The scan code of a key by its W3C `code` name ("KeyA", "ArrowUp"...),
+/// 0 for keys the game does not know.
+pub fn code_to_scan(code: &str) -> ScanCode {
+    KEY_CODES.iter().find(|(n, _)| *n == code).map_or(0, |&(_, sc)| sc)
+}
+
 /// Maps a physical key to its PC/XT scan code (0 = not mapped).
-pub fn key_to_scan(k: KeyCode) -> ScanCode {
-    use KeyCode::*;
-    match k {
-        Escape => 0x01,
-        Digit1 => 0x02,
-        Digit2 => 0x03,
-        Digit3 => 0x04,
-        Digit4 => 0x05,
-        Digit5 => 0x06,
-        Digit6 => 0x07,
-        Digit7 => 0x08,
-        Digit8 => 0x09,
-        Digit9 => 0x0a,
-        Digit0 => 0x0b,
-        Minus => 0x0c,
-        Equal => 0x0d,
-        Backspace => 0x0e,
-        Tab => 0x0f,
-        KeyQ => 0x10,
-        KeyW => 0x11,
-        KeyE => 0x12,
-        KeyR => 0x13,
-        KeyT => 0x14,
-        KeyY => 0x15,
-        KeyU => 0x16,
-        KeyI => 0x17,
-        KeyO => 0x18,
-        KeyP => 0x19,
-        BracketLeft => 0x1a,
-        BracketRight => 0x1b,
-        Enter | NumpadEnter => 0x1c,
-        ControlLeft | ControlRight => 0x1d,
-        KeyA => 0x1e,
-        KeyS => 0x1f,
-        KeyD => 0x20,
-        KeyF => 0x21,
-        KeyG => 0x22,
-        KeyH => 0x23,
-        KeyJ => 0x24,
-        KeyK => 0x25,
-        KeyL => 0x26,
-        Semicolon => 0x27,
-        Quote => 0x28,
-        Backquote => 0x29,
-        ShiftLeft => 0x2a,
-        Backslash | IntlBackslash => 0x2b,
-        KeyZ => 0x2c,
-        KeyX => 0x2d,
-        KeyC => 0x2e,
-        KeyV => 0x2f,
-        KeyB => 0x30,
-        KeyN => 0x31,
-        KeyM => 0x32,
-        Comma => 0x33,
-        Period => 0x34,
-        Slash => 0x35,
-        ShiftRight => 0x36,
-        NumpadMultiply => 0x37,
-        AltLeft | AltRight => 0x38,
-        Space => 0x39,
-        CapsLock => 0x3a,
-        F1 => 0x3b,
-        F2 => 0x3c,
-        F3 => 0x3d,
-        F4 => 0x3e,
-        F5 => 0x3f,
-        F6 => 0x40,
-        F7 => 0x41,
-        F8 => 0x42,
-        F9 => 0x43,
-        F10 => 0x44,
-        NumLock => 0x45,
-        ScrollLock => 0x46,
-        Home | Numpad7 => 0x47,
-        ArrowUp | Numpad8 => 0x48,
-        PageUp | Numpad9 => 0x49,
-        NumpadSubtract => 0x4a,
-        ArrowLeft | Numpad4 => 0x4b,
-        Numpad5 => 0x4c,
-        ArrowRight | Numpad6 => 0x4d,
-        NumpadAdd => 0x4e,
-        End | Numpad1 => 0x4f,
-        ArrowDown | Numpad2 => 0x50,
-        PageDown | Numpad3 => 0x51,
-        Insert | Numpad0 => 0x52,
-        Delete | NumpadDecimal => 0x53,
-        F11 => 0x57,
-        F12 => 0x58,
-        _ => 0,
-    }
+#[cfg(not(target_arch = "wasm32"))]
+pub fn key_to_scan(k: winit::keyboard::KeyCode) -> ScanCode {
+    code_to_scan(&format!("{:?}", k))
 }
 
 /// Scan code to ASCII tables (ID_IN ASCIINames / ShiftNames).
@@ -422,6 +444,105 @@ pub fn default_pad_map() -> [PadInput; PAD_ACTIONS] {
     [B(13), B(14), B(15), B(16), B(0), B(1), B(2), B(9), B(4), B(6)]
 }
 
+/// One poll of the gamepads, read by the platform layer: the actions held
+/// (all pads together and per pad), the actions held in the poll before,
+/// the first input moved (for binding an action), and presses of SELECT /
+/// raw face (HID buttons 1-4) / other raw buttons of pads without a
+/// mapping.
+#[derive(Clone, Copy, Default)]
+pub struct PadPoll {
+    pub act: [bool; PAD_ACTIONS],
+    pub prev: [bool; PAD_ACTIONS],
+    pub per_pad: [[bool; PAD_ACTIONS]; 4],
+    pub captured: Option<PadInput>,
+    pub select: bool,
+    pub raw_face: bool,
+    pub raw_other: bool,
+}
+
+impl Input {
+    /// Applies a gamepad poll: movement and the jump / pogo / fire buttons
+    /// are held states, MENU sets Esc, jump Space (for "press a key"), the
+    /// state actions `pad_save` / `pad_load`. While the control panel is
+    /// open the pad navigates it, while binding an action the input goes
+    /// to `pad_captured`. In the control panel fire answers Y (yes) in the
+    /// Y/N questions.
+    pub fn apply_pad(&mut self, p: &PadPoll) {
+        let PadPoll { act, prev, per_pad, captured, select, raw_face, raw_other } = *p;
+        let pressed = |k: usize| act[k] && !prev[k];
+        let i = self;
+        i.pad_x = 0;
+        i.pad_y = 0;
+        i.pad_jump = false;
+        i.pad_pogo = false;
+        i.pad_fire = false;
+        i.pads = Default::default();
+        if i.pad_capture {
+            if captured.is_some() {
+                i.pad_captured = captured;
+            }
+            return;
+        }
+        if i.pad_menu_nav {
+            for (k, sc) in [
+                (PAD_UP, SC_UPARROW),
+                (PAD_DOWN, SC_DOWNARROW),
+                (PAD_LEFT, SC_LEFTARROW),
+                (PAD_RIGHT, SC_RIGHTARROW),
+                (PAD_JUMP, SC_RETURN),
+                // "yes" in the Y/N questions (quit, end game, resume)
+                (PAD_FIRE, SC_Y),
+                (PAD_POGO, SC_ESCAPE),
+                (PAD_MENU, SC_ESCAPE),
+            ] {
+                if pressed(k) {
+                    i.last_scan = sc;
+                }
+            }
+            // SELECT backs out as well (unless bound to an action)
+            if select && !i.pad_map.contains(&PadInput::Button(8)) {
+                i.last_scan = SC_ESCAPE;
+            }
+            // unmapped pad whose buttons are not configured yet
+            if !i.pad_map.iter().any(|b| matches!(b, PadInput::RawButton(_))) {
+                if raw_face {
+                    i.last_scan = SC_RETURN;
+                } else if raw_other {
+                    i.last_scan = SC_ESCAPE;
+                }
+            }
+            return;
+        }
+        // multiplayer: each pad plays its own Keen
+        let ctl = |a: &[bool; PAD_ACTIONS]| PadControl {
+            x: if a[PAD_LEFT] { -1 } else if a[PAD_RIGHT] { 1 } else { 0 },
+            y: if a[PAD_UP] { -1 } else if a[PAD_DOWN] { 1 } else { 0 },
+            jump: a[PAD_JUMP],
+            pogo: a[PAD_POGO],
+            fire: a[PAD_FIRE],
+        };
+        let p1 = ctl(if i.players >= 2 { &per_pad[0] } else { &act });
+        i.pad_x = p1.x;
+        i.pad_y = p1.y;
+        i.pad_jump = p1.jump;
+        i.pad_pogo = p1.pogo;
+        i.pad_fire = p1.fire;
+        if i.players >= 2 {
+            for n in 0..4 {
+                i.pads[n] = ctl(&per_pad[n]);
+            }
+        }
+        if pressed(PAD_JUMP) {
+            i.last_scan = SC_SPACE;
+        }
+        if pressed(PAD_MENU) {
+            i.last_scan = SC_ESCAPE;
+        }
+        i.pad_save |= pressed(PAD_SAVESTATE);
+        i.pad_load |= pressed(PAD_LOADSTATE);
+    }
+}
+
 /// The game controls of one gamepad.
 #[derive(Clone, Copy, Default)]
 pub struct PadControl {
@@ -633,5 +754,36 @@ mod pad_tests {
         assert_eq!(PadInput::RawAxis(HID_Y, true).name(), "Y DOWN");
         assert_eq!(PadInput::parse("b99"), None);
         assert_eq!(PadInput::parse("a9+"), None);
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod key_tests {
+    use super::*;
+    use winit::keyboard::KeyCode;
+
+    /// The table's names are winit `KeyCode` names (`key_to_scan` looks
+    /// them up by the variant's name).
+    #[test]
+    fn key_code_names() {
+        assert_eq!(key_to_scan(KeyCode::KeyA), SC_A);
+        assert_eq!(key_to_scan(KeyCode::ArrowUp), SC_UPARROW);
+        assert_eq!(key_to_scan(KeyCode::NumpadEnter), SC_RETURN);
+        assert_eq!(key_to_scan(KeyCode::ControlRight), SC_CONTROL);
+        assert_eq!(key_to_scan(KeyCode::F12), 0x58);
+        assert_eq!(key_to_scan(KeyCode::Pause), 0);
+        let all = [
+            KeyCode::Escape, KeyCode::Minus, KeyCode::Equal, KeyCode::Backspace, KeyCode::Tab, KeyCode::BracketLeft,
+            KeyCode::BracketRight, KeyCode::Enter, KeyCode::Semicolon, KeyCode::Quote, KeyCode::Backquote,
+            KeyCode::Backslash, KeyCode::IntlBackslash, KeyCode::Comma, KeyCode::Period, KeyCode::Slash,
+            KeyCode::NumpadMultiply, KeyCode::AltLeft, KeyCode::Space, KeyCode::CapsLock, KeyCode::NumLock,
+            KeyCode::ScrollLock, KeyCode::Home, KeyCode::PageUp, KeyCode::NumpadSubtract, KeyCode::Numpad5,
+            KeyCode::NumpadAdd, KeyCode::End, KeyCode::PageDown, KeyCode::Insert, KeyCode::Delete,
+            KeyCode::NumpadDecimal, KeyCode::Digit0, KeyCode::KeyZ, KeyCode::ShiftRight,
+        ];
+        for k in all {
+            assert_ne!(key_to_scan(k), 0, "{:?}", k);
+        }
+        assert_eq!(KEY_CODES.len(), 99);
     }
 }

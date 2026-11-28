@@ -314,6 +314,13 @@ impl Sys {
         self.time_offset = v as i64 - ticks;
     }
 
+    /// Sleeps `ms` milliseconds (not in headless mode).
+    pub fn sleep_ms(&mut self, ms: u32) {
+        if self.headless_time.is_none() {
+            std::thread::sleep(Duration::from_millis(ms as u64));
+        }
+    }
+
     /// Sleeps until TimeCount reaches `t` (keeps the window responsive).
     pub fn wait_until(&mut self, t: i32) {
         if let Some(h) = &mut self.headless_time {
@@ -577,76 +584,7 @@ impl Sys {
             }
         }
         let prev = std::mem::replace(&mut self.pad_prev, act);
-        let pressed = |k: usize| act[k] && !prev[k];
-        i.pad_x = 0;
-        i.pad_y = 0;
-        i.pad_jump = false;
-        i.pad_pogo = false;
-        i.pad_fire = false;
-        i.pads = Default::default();
-        if i.pad_capture {
-            if captured.is_some() {
-                i.pad_captured = captured;
-            }
-            return;
-        }
-        if i.pad_menu_nav {
-            for (k, sc) in [
-                (PAD_UP, SC_UPARROW),
-                (PAD_DOWN, SC_DOWNARROW),
-                (PAD_LEFT, SC_LEFTARROW),
-                (PAD_RIGHT, SC_RIGHTARROW),
-                (PAD_JUMP, SC_RETURN),
-                // "yes" in the Y/N questions (quit, end game, resume)
-                (PAD_FIRE, SC_Y),
-                (PAD_POGO, SC_ESCAPE),
-                (PAD_MENU, SC_ESCAPE),
-            ] {
-                if pressed(k) {
-                    i.last_scan = sc;
-                }
-            }
-            // SELECT backs out as well (unless bound to an action)
-            if select && !i.pad_map.contains(&PadInput::Button(8)) {
-                i.last_scan = SC_ESCAPE;
-            }
-            // unmapped pad whose buttons are not configured yet
-            if !i.pad_map.iter().any(|b| matches!(b, PadInput::RawButton(_))) {
-                if raw_face {
-                    i.last_scan = SC_RETURN;
-                } else if raw_other {
-                    i.last_scan = SC_ESCAPE;
-                }
-            }
-            return;
-        }
-        // multiplayer: each pad plays its own Keen
-        let ctl = |a: &[bool; PAD_ACTIONS]| super::input::PadControl {
-            x: if a[PAD_LEFT] { -1 } else if a[PAD_RIGHT] { 1 } else { 0 },
-            y: if a[PAD_UP] { -1 } else if a[PAD_DOWN] { 1 } else { 0 },
-            jump: a[PAD_JUMP],
-            pogo: a[PAD_POGO],
-            fire: a[PAD_FIRE],
-        };
-        let p1 = ctl(if i.players >= 2 { &per_pad[0] } else { &act });
-        i.pad_x = p1.x;
-        i.pad_y = p1.y;
-        i.pad_jump = p1.jump;
-        i.pad_pogo = p1.pogo;
-        i.pad_fire = p1.fire;
-        if i.players >= 2 {
-            for n in 0..4 {
-                i.pads[n] = ctl(&per_pad[n]);
-            }
-        }
-        if pressed(PAD_JUMP) {
-            i.last_scan = SC_SPACE;
-        }
-        if pressed(PAD_MENU) {
-            i.last_scan = SC_ESCAPE;
-        }
-        i.pad_save |= pressed(PAD_SAVESTATE);
-        i.pad_load |= pressed(PAD_LOADSTATE);
+        i.apply_pad(&PadPoll { act, prev, per_pad, captured, select, raw_face, raw_other });
     }
 
     fn sync_keys(&mut self) {

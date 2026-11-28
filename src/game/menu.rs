@@ -2044,7 +2044,7 @@ impl Game {
             self.usl_show_load_save("Saving", &name);
             if let Err(e) = self.save_game_file(i) {
                 self.usl_handle_error(&e);
-                let _ = std::fs::remove_file(self.save_path(i));
+                let _ = crate::vfs::remove_file(self.save_path(i));
                 ok = false;
             }
         }
@@ -2899,7 +2899,7 @@ impl Game {
     /// USL_CheckSavedGames (0x283b1): reads the names of the saved games.
     fn usl_check_saved_games(&mut self) {
         for n in 0..MAXSAVEGAMES {
-            let slot = std::fs::read(self.save_path(n)).ok().and_then(|d| {
+            let slot = crate::vfs::read(self.save_path(n)).ok().and_then(|d| {
                 if d.len() < SAVEMAGIC.len() || &d[..SAVEMAGIC.len()] != SAVEMAGIC {
                     return None;
                 }
@@ -2921,12 +2921,12 @@ impl Game {
     fn save_game_path(&mut self, path: &std::path::Path, name: &str) -> Result<(), String> {
         let data = self.save_game_bytes(name);
         if let Some(d) = path.parent() {
-            std::fs::create_dir_all(d).map_err(|e| io_error_text(&e))?;
+            crate::vfs::create_dir_all(d).map_err(|e| io_error_text(&e))?;
         }
         // write a temporary file first: a crash never leaves half a save
         let tmp = path.with_extension("tmp");
-        std::fs::write(&tmp, &data).map_err(|e| io_error_text(&e))?;
-        std::fs::rename(&tmp, path).map_err(|e| io_error_text(&e))
+        crate::vfs::write(&tmp, &data).map_err(|e| io_error_text(&e))?;
+        crate::vfs::rename(&tmp, path).map_err(|e| io_error_text(&e))
     }
 
     /// SaveTheGame into memory (the contents of a saved game file).
@@ -3103,7 +3103,7 @@ impl Game {
 
     /// LoadTheGame from a file.
     fn load_game_path(&mut self, path: &std::path::Path) -> Result<(), String> {
-        let d = std::fs::read(path).map_err(|e| io_error_text(&e))?;
+        let d = crate::vfs::read(path).map_err(|e| io_error_text(&e))?;
         self.load_game_bytes(&d)
     }
 
@@ -3311,7 +3311,7 @@ impl Game {
     /// Removes the autosave (the game ended or a new one started).
     pub fn discard_autosave(&mut self) {
         if self.autosave_enabled() {
-            let _ = std::fs::remove_file(self.autosave_path());
+            let _ = crate::vfs::remove_file(self.autosave_path());
         }
     }
 
@@ -3322,7 +3322,7 @@ impl Game {
             return false;
         }
         let path = self.autosave_path();
-        let Ok(d) = std::fs::read(&path) else { return false };
+        let Ok(d) = crate::vfs::read(&path) else { return false };
         if self.parse_saved_game(&d).is_err() {
             return false;
         }
@@ -3396,7 +3396,7 @@ impl Game {
 
     /// USL_ReadConfig (0x28145), as a text file `config.txt`.
     pub fn load_config(&mut self) {
-        let Ok(text) = std::fs::read_to_string(self.config_path()) else {
+        let Ok(text) = crate::vfs::read_to_string(self.config_path()) else {
             return;
         };
         let mut quiet = self.sd.quiet_adlib;
@@ -3533,7 +3533,7 @@ impl Game {
         for h in &self.demo.scores {
             text += &format!("highscore={},{},{}\n", h.score, h.completed, String::from_utf8_lossy(&h.name));
         }
-        if let Err(e) = std::fs::write(self.config_path(), text) {
+        if let Err(e) = crate::vfs::write(self.config_path(), text) {
             eprintln!("could not write config.txt: {}", e);
         }
     }
@@ -3549,7 +3549,7 @@ impl Game {
         let mut ok = false;
         if self.menu.creature_num == -1 {
             // DOS time: hour + hundredths of a second
-            let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+            let t = crate::vfs::now_since_epoch();
             let hour = (t.as_secs() / 3600 % 24) as i32;
             let hund = (t.subsec_millis() / 10) as i32;
             self.menu.creature_num = (hour + hund) % 12;
@@ -3732,8 +3732,8 @@ impl Game {
     /// grab screenshots; the port saves a PNG to `screenshots/` instead.
     fn debug_screenshot(&mut self) {
         let dir = self.data.write_dir.join("screenshots");
-        let _ = std::fs::create_dir_all(&dir);
-        let n = (0..10000).find(|n| !dir.join(format!("SHOT{:04}.png", n)).exists()).unwrap_or(0);
+        let _ = crate::vfs::create_dir_all(&dir);
+        let n = (0..10000).find(|n| !crate::vfs::exists(&dir.join(format!("SHOT{:04}.png", n)))).unwrap_or(0);
         let path = dir.join(format!("SHOT{:04}.png", n));
         let msg = match self.sys.save_screenshot(&path) {
             Ok(()) => format!("Saved SHOT{:04}.png", n),

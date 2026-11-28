@@ -169,6 +169,12 @@ Here are some new command line parameters:
   {K} --export-sfx DIR  (Write the sound effects out as WAV files.)
   {K} --help  (Show all of the parameters.)
 ^P
+{D}{H}IN THE WEB BROWSER
+{B}
+Keen also plays in a web browser. The game files you choose there stay in the browser, and so do your saved games and settings.
+
+Press F11 or double-click for fullscreen. Gamepads work, too: press a button on one so the browser lets Keen see it. MIDI Music, new sounds and high resolution graphics are only in the version you download.
+^P
 {D}{C}CONCLUSION
 {B}
 Now go try out the new tricks, and have fun playing "{N}"!
