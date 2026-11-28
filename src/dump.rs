@@ -11,13 +11,16 @@ pub const EGA_RGB: [u32; 16] = [
 ];
 
 pub fn write_png(path: &Path, w: usize, h: usize, rgba: &[u8]) -> std::io::Result<()> {
-    let f = std::fs::File::create(path)?;
-    let mut enc = png::Encoder::new(std::io::BufWriter::new(f), w as u32, h as u32);
-    enc.set_color(png::ColorType::Rgba);
-    enc.set_depth(png::BitDepth::Eight);
-    let mut wr = enc.write_header().map_err(std::io::Error::other)?;
-    wr.write_image_data(rgba).map_err(std::io::Error::other)?;
-    Ok(())
+    let mut out = Vec::new();
+    {
+        let mut enc = png::Encoder::new(&mut out, w as u32, h as u32);
+        enc.set_color(png::ColorType::Rgba);
+        enc.set_depth(png::BitDepth::Eight);
+        let mut wr = enc.write_header().map_err(std::io::Error::other)?;
+        wr.write_image_data(rgba).map_err(std::io::Error::other)?;
+    }
+    // (through the VFS: in the browser screenshots are offered as downloads)
+    crate::vfs::write(path, &out)
 }
 
 pub fn image_rgba(img: &Image) -> Vec<u8> {

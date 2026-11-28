@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Commander Keen</title>
+<link rel="icon" href="icon.png">
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #000;
+    color: #d8d8d8;
+    font: 15px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    overflow: hidden;
+  }
+  body {
+    display: grid;
+    place-items: center;
+  }
+  body.nocursor, body.nocursor canvas { cursor: none; }
+  canvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    padding: 24px;
+    background: #000;
+    text-align: center;
+    cursor: default;
+  }
+  #overlay[hidden] { display: none; }
+  #overlay > * { max-width: 40em; margin-left: auto; margin-right: auto; }
+  h1 {
+    color: #55ff55;
+    font-size: 22px;
+    font-weight: normal;
+    letter-spacing: 0.04em;
+    margin: 0 0 1em;
+  }
+  p { margin: 0 0 1em; }
+  .small { color: #a8a8a8; font-size: 13px; }
+  .error { color: #ff5555; }
+  code { color: #ffff55; }
+  a { color: #55ffff; }
+  .button {
+    display: inline-block;
+    margin: 4px 6px;
+    padding: 8px 16px;
+    border: 2px solid #55ffff;
+    background: #0000aa;
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+  }
+  .button:hover, .button:focus-visible { background: #5555ff; outline: none; }
+  .button.big { font-size: 18px; padding: 10px 36px; }
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    max-width: 90vw;
+    padding: 6px 14px;
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid #555;
+    font-size: 13px;
+    pointer-events: none;
+  }
+  #toast[hidden] { display: none; }
+</style>
+</head>
+<body>
+<canvas id="screen" width="320" height="200"></canvas>
+<div id="overlay"><p class="small">Loading…</p></div>
+<div id="toast" hidden></div>
+<noscript><p>Commander Keen needs JavaScript.</p></noscript>
+<script type="module" src="main.js"></script>
+</body>
+</html>

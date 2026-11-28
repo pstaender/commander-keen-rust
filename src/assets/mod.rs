@@ -30,17 +30,17 @@ pub struct GameData {
 /// Finds a file case-insensitively inside `dir`.
 pub fn find_file(dir: &Path, name: &str) -> Option<PathBuf> {
     let direct = dir.join(name);
-    if direct.exists() {
+    if crate::vfs::exists(&direct) {
         return Some(direct);
     }
-    std::fs::read_dir(dir).ok()?.flatten().map(|e| e.path()).find(|p| {
+    crate::vfs::list_dir(dir).ok()?.into_iter().find(|p| {
         p.file_name().and_then(|n| n.to_str()).map(|n| n.eq_ignore_ascii_case(name)).unwrap_or(false)
     })
 }
 
 fn read(dir: &Path, name: &str) -> Result<Vec<u8>, String> {
     let p = find_file(dir, name).ok_or_else(|| format!("missing data file {} in {}", name, dir.display()))?;
-    std::fs::read(&p).map_err(|e| format!("{}: {}", p.display(), e))
+    crate::vfs::read(&p).map_err(|e| format!("{}: {}", p.display(), e))
 }
 
 impl GameData {

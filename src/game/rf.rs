@@ -857,7 +857,7 @@ impl Game {
                 if self.tics >= 2 || self.sys.quit {
                     break;
                 }
-                std::thread::sleep(std::time::Duration::from_millis(2));
+                self.sys.sleep_ms(2);
                 self.sys.poll();
             }
             let newtime = self.lasttimecount + self.tics;

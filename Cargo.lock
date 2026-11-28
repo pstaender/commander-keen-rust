@@ -1342,11 +1342,13 @@ dependencies = [
  "embed-resource",
  "gilrs",
  "hidapi",
+ "js-sys",
  "oplon",
  "png 0.17.16",
  "rodio",
  "rustysynth",
  "softbuffer",
+ "wasm-bindgen",
  "winit",
 ]
 
@@ -1357,6 +1359,15 @@ dependencies = [
  "eframe",
  "keen",
  "rfd",
+]
+
+[[package]]
+name = "keen-web"
+version = "0.5.0"
+dependencies = [
+ "js-sys",
+ "keen",
+ "wasm-bindgen",
 ]
 
 [[package]]

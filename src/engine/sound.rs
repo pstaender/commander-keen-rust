@@ -13,10 +13,62 @@
 
 use crate::assets::audio::{AdlibSound, Audio, PcSound, Song};
 use oplon::Opl2;
-use rodio::{OutputStreamBuilder, Sink, Source};
+#[cfg(not(target_arch = "wasm32"))]
+use rodio::OutputStreamBuilder;
+use rodio::{Sink, Source};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+/// In the browser there is no rodio: the synth is pulled by the platform
+/// layer (`sys_web.rs`). The sinks for replacement files and SoundFont
+/// music are never created there, these stand-ins only keep the code the
+/// same.
+#[cfg(target_arch = "wasm32")]
+#[allow(dead_code)]
+mod rodio {
+    use std::time::Duration;
+
+    pub trait Source: Iterator<Item = f32> {
+        fn current_span_len(&self) -> Option<usize>;
+        fn channels(&self) -> u16;
+        fn sample_rate(&self) -> u32;
+        fn total_duration(&self) -> Option<Duration>;
+    }
+
+    /// (no value of it exists)
+    pub enum Sink {}
+
+    impl Sink {
+        pub fn empty(&self) -> bool {
+            match *self {}
+        }
+        pub fn clear(&self) {
+            match *self {}
+        }
+        pub fn play(&self) {
+            match *self {}
+        }
+        pub fn set_volume(&self, _v: f32) {
+            match *self {}
+        }
+        pub fn append<S>(&self, _s: S) {
+            match *self {}
+        }
+    }
+
+    /// Decoding of replacement files (never succeeds here).
+    pub struct Decoder;
+
+    impl Decoder {
+        pub fn try_from(_f: std::fs::File) -> Result<Decoder, ()> {
+            Err(())
+        }
+        pub fn new_looped(_f: std::fs::File) -> Result<Decoder, ()> {
+            Err(())
+        }
+    }
+}
 
 pub const SAMPLE_RATE: u32 = 44100;
 const PIT_HZ: f64 = 1_193_181.0;
@@ -402,16 +454,23 @@ impl Source for MidiSource {
 
 /// how long the audio output may take to start before the game goes on
 /// without sound
+#[cfg(not(target_arch = "wasm32"))]
 const AUDIO_OPEN_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// The audio output, opened and kept on a thread of its own: a device that
 /// never finishes starting (CoreAudio waiting for an HDMI screen's audio,
 /// e.g.) only costs the sound, not the game. Dropping it closes the output.
+#[cfg(not(target_arch = "wasm32"))]
 struct AudioOutput {
     mixer: rodio::mixer::Mixer,
     _stop: std::sync::mpsc::Sender<()>,
 }
 
+/// In the browser the page plays what the synth renders (`sys_web.rs`).
+#[cfg(target_arch = "wasm32")]
+struct AudioOutput;
+
+#[cfg(not(target_arch = "wasm32"))]
 impl AudioOutput {
     fn open() -> Result<AudioOutput, String> {
         let (tx, rx) = std::sync::mpsc::channel();
@@ -587,6 +646,20 @@ impl SoundManager {
             midi_requested: false,
         };
         let synth = Arc::new(Mutex::new(Synth::new(audio)));
+        #[cfg(target_arch = "wasm32")]
+        if enable && super::sys::page_connected() {
+            let mut src = SynthSource { synth: synth.clone(), buf: Vec::new(), pos: 0 };
+            // (mono, the page plays stereo)
+            super::sys::set_audio_source(Box::new(move |out: &mut [f32]| {
+                for f in out.chunks_exact_mut(2) {
+                    let v = src.next().unwrap_or(0.0);
+                    f[0] = v;
+                    f[1] = v;
+                }
+            }));
+            sm.output = Some(AudioOutput);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
         if enable {
             match AudioOutput::open() {
                 Ok(out) => {

@@ -5,6 +5,7 @@ pub mod dump;
 pub mod cli;
 pub mod engine;
 pub mod options;
+pub mod vfs;
 
 pub mod ck4;
 pub mod ck5;
