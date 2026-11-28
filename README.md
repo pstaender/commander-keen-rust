@@ -373,6 +373,24 @@ for each of them:
 keen4 --data KEEN4 --gfx-pack packs/keen-laptop
 ```
 
+Without `--gfx-pack` the game uses a `gfx-pack` directory next to the
+executable (or in its macOS app bundle's `Contents/Resources`), if there is
+one. `tools/build_with_pack.sh [--windows] [PACK_DIR] [OUT_DIR]` uses that:
+it downloads the original Keen 4, 5 and 6 files from archive.org (kept in
+`downloads/`), builds the three games for the system it runs on (macOS,
+Linux, Windows with Git Bash), checks a demo of each with the pack and
+packages them with their data and the pack in `dist/keen-laptop/<system>`
+(macOS: `Keen 4.app` … `Keen 6.app`; otherwise `keen4`…`keen6` with `data/`
+and `gfx-pack/`). `--windows` also cross-builds the Windows version on
+macOS/Linux (needs `zig` and `cargo install cargo-zigbuild`; the .exe files
+then have no icon). The GitHub workflow *Build with a graphics pack*
+(`.github/workflows/build-pack.yml`, started by hand and with every
+published release) runs the script on
+Linux, Windows and macOS, keeps the archives as artifacts for a few days and
+attaches them to the release (`commander-keen-rust-<tag>-keen-laptop-<os>`,
+with the data of all three episodes). The game data is only downloaded for
+the build and never committed (`downloads/` and `dist/` are git-ignored).
+
 ### Audio replacement: `--audio-pack DIR`
 
 - `DIR/sfx/NN.ogg` (or `.wav`, `.flac`, `.mp3`) replaces sound effect NN

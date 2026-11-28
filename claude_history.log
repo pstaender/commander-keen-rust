@@ -27,3 +27,27 @@
   set-mode subcommand if no 0x30 report arrives. `sync_pad` works on
   `PadView` (gilrs pad or Pro state); gilrs' Pro pads and their events are
   skipped while the driver has one open.
+
+## 2026-11-28 Build script with a graphics pack
+- `tools/build_with_pack.sh [PACK] [OUT]` (default packs/keen-laptop,
+  dist/<pack>): downloads Keen 4/5/6 from archive.org (msdos_ items for 4
+  and 6, keen5) and the GeneralUser GS SoundFont into downloads/, builds
+  (universal on macOS), replays demo 0 of each episode with the pack and
+  packages: macOS app bundles with data + gfx-pack in Resources, elsewhere
+  binaries + data/ + gfx-pack/. downloads/ and dist/ are git-ignored.
+- cli.rs: `find_bundled_gfx_pack` – without --gfx-pack a `gfx-pack` dir
+  (with pack.txt) next to the executable / in the app bundle is used.
+- Linux/Windows: the script runs natively on all three OSes (unzip / 7z /
+  python zipfile fallback), output per OS in dist/<pack>/<os>; `--windows`
+  cross-builds x86_64-pc-windows-gnu with cargo-zigbuild (works from macOS;
+  build.rs only embeds the icon on a Windows host). Linux can't be
+  cross-built from macOS (alsa-sys/libudev need a sysroot).
+  `.github/workflows/build-pack.yml` (workflow_dispatch, inputs pack and
+  retention) runs the script on ubuntu/windows/macos, caches downloads/ per
+  half year, uploads tar.gz/zip artifacts (contain K5/K6 data: never
+  attached to a release).
+- build-pack.yml also runs on a published release (pack defaults to
+  packs/keen-laptop, retention 7 days); still artifacts only.
+- build-pack.yml attaches its archives (all three episodes' data) to the
+  release as commander-keen-rust-<tag>-<pack>-<os> (contents: write); the
+  data is still only downloaded at build time, never committed.

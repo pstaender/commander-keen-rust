@@ -12,3 +12,6 @@
 /re/k4/
 /re/k5/
 .env
+# downloads and builds of tools/build_with_pack.sh (contain the game data)
+/downloads/
+/dist/

@@ -12,7 +12,8 @@ const USAGE: &str = "keenN [options]
                      episode is detected from the files; default: KEENN in
                      the current directory, next to the executable or in
                      data/ next to it)
-  --gfx-pack DIR     high resolution graphics replacement pack
+  --gfx-pack DIR     high resolution graphics replacement pack (default: a
+                     gfx-pack directory next to the executable, if any)
   --audio-pack DIR   replacement sound effects (sfx/NN.ogg) and music (music/NN.ogg|.mid)
   --soundfont FILE   SoundFont (.sf2) for the MIDI music (CONFIGURE >
                      MUSIC > MIDI MUSIC) and .mid files of an audio pack;
@@ -215,6 +216,9 @@ pub fn main(default_dir: &str) {
         println!("dumped to {}", d.display());
         return;
     }
+    if gfx_pack.is_none() {
+        gfx_pack = find_bundled_gfx_pack();
+    }
     let scale = gfx_pack.as_deref().map(pack_scale).unwrap_or(1);
     let gfx = Gfx::new(&data.gfx, scale, gfx_pack.as_deref());
     if !opts.classic && soundfont.is_none() {
@@ -236,6 +240,17 @@ pub fn main(default_dir: &str) {
         Episode::K5 => crate::ck5::run(sys, data, gfx, sd, opts),
         Episode::K6 => crate::ck6::run(sys, data, gfx, sd, opts),
     }
+}
+
+/// A graphics pack shipped with the executable, used without --gfx-pack: a
+/// `gfx-pack` directory (with a pack.txt) next to it, in data/ there, in a
+/// macOS app bundle's Resources or beside the app (tools/build_with_pack.sh).
+fn find_bundled_gfx_pack() -> Option<PathBuf> {
+    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    ["gfx-pack", "data/gfx-pack", "../Resources/gfx-pack", "../../../gfx-pack"]
+        .iter()
+        .map(|c| exe_dir.join(c))
+        .find(|d| d.join("pack.txt").is_file())
 }
 
 /// `--export-midi DIR`: every song as DIR/music/NN.mid plus a report of the

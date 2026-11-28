@@ -1,0 +1,116 @@
+# Builds keen4, keen5 and keen6 with a graphics pack (default
+# packs/keen-laptop) for Linux, Windows and macOS with
+# tools/build_with_pack.sh, started by hand (Actions > Build with a
+# graphics pack > Run workflow) and with every published release (with
+# packs/keen-laptop).
+#
+# The archives contain the original data of all three episodes (also
+# Keen 5 and 6, from archive.org, with permission): kept as workflow
+# artifacts for a few days and, for a release, attached to it.
+name: Build with a graphics pack
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      pack:
+        description: Graphics pack directory
+        default: packs/keen-laptop
+        required: true
+      retention:
+        description: Days to keep the artifacts
+        default: "7"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            os: ubuntu-latest
+          - platform: windows
+            os: windows-latest
+          - platform: macos
+            os: macos-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: pack-${{ matrix.platform }}
+
+      # one cache key per half year, so archive.org is asked at most twice a year
+      - name: Cache key
+        id: key
+        run: echo "key=keen-pack-downloads-v1-$(date -u +%Y)-h$(( ($(date -u +%-m) + 5) / 6 ))" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the downloads
+        uses: actions/cache@v6
+        with:
+          path: downloads
+          key: ${{ steps.key.outputs.key }}
+          enableCrossOsArchive: true
+
+      - name: Build and package
+        env:
+          PACK: ${{ inputs.pack || 'packs/keen-laptop' }}
+        run: tools/build_with_pack.sh "$PACK" dist/pack
+
+      - name: Archive
+        id: pkg
+        env:
+          PACK: ${{ inputs.pack || 'packs/keen-laptop' }}
+        run: |
+          name="commander-keen-rust-$(basename "$PACK")-${{ matrix.platform }}"
+          mv "dist/pack/${{ matrix.platform }}" "dist/$name"
+          cd dist
+          if [ "$RUNNER_OS" = Windows ]; then
+            7z a -tzip "$name.zip" "$name" > /dev/null
+            echo "file=dist/$name.zip" >> "$GITHUB_OUTPUT"
+          else
+            tar czf "$name.tar.gz" "$name"
+            echo "file=dist/$name.tar.gz" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.platform }}
+          path: ${{ steps.pkg.outputs.file }}
+          retention-days: ${{ fromJSON(inputs.retention || '7') }}
+
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          FILE: ${{ steps.pkg.outputs.file }}
+        run: |
+          # versioned like the archives of release.yml
+          dir=$(dirname "$FILE") base=$(basename "$FILE")
+          versioned="$dir/${base/commander-keen-rust-/commander-keen-rust-$TAG-}"
+          mv "$FILE" "$versioned"
+          gh release upload "$TAG" "$versioned" --clobber
